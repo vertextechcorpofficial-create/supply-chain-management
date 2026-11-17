@@ -34,8 +34,9 @@ export function useStockMonitoring() {
     try {
       setLoading(true);
       setError(null);
+      const effectiveBranchParam = viewMode === "aggregated" ? "all" : branchFilter;
       const [stockData, partsData, classData, branchData] = await Promise.all([
-        fetchStockRecords(branchFilter),
+        fetchStockRecords(effectiveBranchParam),
         fetchVehicleParts(),
         fetchClassifications(),
         fetchBranches(),
@@ -50,7 +51,7 @@ export function useStockMonitoring() {
     } finally {
       setLoading(false);
     }
-  }, [branchFilter]);
+  }, [branchFilter, viewMode]);
 
   React.useEffect(() => {
     loadData();

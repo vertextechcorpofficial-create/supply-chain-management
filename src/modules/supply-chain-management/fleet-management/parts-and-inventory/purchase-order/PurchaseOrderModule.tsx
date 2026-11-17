@@ -50,16 +50,18 @@ export default function PurchaseOrderModule() {
   const handleEditPr = (pr: PurchaseRequest) => {
     setSelectedTrigger(null);
     setSelectedEditPr(pr);
-    setCreateModalOpen(true);
+    setBulkModalOpen(true);
   };
 
   const handleBulkReorder = () => {
+    setSelectedEditPr(null);
     if (selectedTriggers.length === 0) return;
     setBulkModalOpen(true);
   };
 
   const handleBulkSuccess = () => {
     setSelectedTriggers([]);
+    setSelectedEditPr(null);
     refresh();
   };
 
@@ -83,7 +85,10 @@ export default function PurchaseOrderModule() {
         loading={loading}
         onRefresh={refresh}
         onOpenCreateModal={handleOpenBlankModal}
-        onOpenBulkModal={() => setBulkModalOpen(true)}
+        onOpenBulkModal={() => {
+          setSelectedEditPr(null);
+          setBulkModalOpen(true);
+        }}
       />
 
       {/* 3. Tabs: Reorder Triggers (Low Stock) vs Purchase Requests */}
@@ -132,14 +137,18 @@ export default function PurchaseOrderModule() {
         onSuccess={refresh}
       />
 
-      {/* 5. Bulk Create PR Dialog */}
+      {/* 5. Multi-Part Create/Edit PR Dialog */}
       <BulkPurchaseRequestDialog
         open={bulkModalOpen}
-        onOpenChange={setBulkModalOpen}
+        onOpenChange={(isOpen) => {
+          setBulkModalOpen(isOpen);
+          if (!isOpen) setSelectedEditPr(null);
+        }}
         selectedItems={selectedTriggers}
         branches={branches}
         parts={parts}
         suppliers={suppliers}
+        editPr={selectedEditPr}
         onSuccess={handleBulkSuccess}
       />
     </div>

@@ -154,7 +154,6 @@ export function ReorderTriggersTable({
               <TableHead>Branch</TableHead>
               <TableHead className="text-right">On-Hand</TableHead>
               <TableHead className="text-right">Reorder Point</TableHead>
-              <TableHead className="text-right">Deficit (Shortage)</TableHead>
               <TableHead className="text-right">Unit Cost</TableHead>
               <TableHead className="text-right">Suggested Order</TableHead>
               <TableHead className="text-center">Severity</TableHead>
@@ -166,6 +165,7 @@ export function ReorderTriggersTable({
               const isOutOfStock = item.on_hand <= 0;
               const lineEstimatedCost = item.suggested_quantity * item.unit_cost;
               const selected = isItemSelected(item);
+              const hasActivePr = Boolean(item.active_pr_no);
 
               return (
                 <TableRow
@@ -184,6 +184,13 @@ export function ReorderTriggersTable({
                   <TableCell>
                     <div className="text-xs font-mono font-medium">{item.part_code}</div>
                     <div className="text-xs text-muted-foreground font-normal">{item.part_name}</div>
+                    {hasActivePr && (
+                      <div className="mt-1 flex items-center gap-1.5">
+                        <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 font-mono py-0">
+                          PR: {item.active_pr_no} ({item.active_pr_status || "Pending"})
+                        </Badge>
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className="text-xs">{item.branch_name}</TableCell>
                   <TableCell className="text-right font-bold text-xs">
@@ -195,14 +202,14 @@ export function ReorderTriggersTable({
                   <TableCell className="text-right text-xs font-medium text-muted-foreground">
                     {item.reorder_point} {item.unit}
                   </TableCell>
-                  <TableCell className="text-right text-xs font-semibold text-rose-600">
-                    -{item.deficit} {item.unit}
-                  </TableCell>
                   <TableCell className="text-right text-xs font-medium">
                     ₱{item.unit_cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </TableCell>
                   <TableCell className="text-right text-xs font-bold text-foreground">
-                    {item.suggested_quantity} {item.unit}{" "}
+                    {item.suggested_quantity} {item.unit}
+                    <span className="text-[10px] text-rose-600 block font-normal">
+                      Deficit: {item.deficit} {item.unit}
+                    </span>
                     <span className="text-[10px] text-muted-foreground block font-normal">
                       ≈ ₱{lineEstimatedCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
@@ -226,7 +233,7 @@ export function ReorderTriggersTable({
                       className="h-8 text-xs gap-1 border-primary/40 hover:bg-primary/10 text-primary font-medium"
                     >
                       <ShoppingCart className="h-3.5 w-3.5" />
-                      Reorder
+                      {hasActivePr ? "Reorder More" : "Reorder"}
                     </Button>
                   </TableCell>
                 </TableRow>

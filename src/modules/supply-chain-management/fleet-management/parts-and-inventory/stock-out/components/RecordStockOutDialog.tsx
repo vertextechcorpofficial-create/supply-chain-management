@@ -247,7 +247,7 @@ export function RecordStockOutDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!max-w-4xl sm:!max-w-4xl w-[94vw] max-h-[90vh] flex flex-col p-6 overflow-hidden">
+      <DialogContent className="max-w-2xl sm:max-w-3xl w-[95vw] max-h-[85vh] flex flex-col p-6 overflow-hidden">
         <DialogHeader className="shrink-0 pb-1">
           <DialogTitle className="text-base flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-rose-600" />
@@ -268,7 +268,7 @@ export function RecordStockOutDialog({
             )}
 
             {/* Branch, Reason, and Reference Number Header Controls */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold">
                   Branch <span className="text-destructive font-bold">*</span>
@@ -285,7 +285,7 @@ export function RecordStockOutDialog({
                     }
                   }}
                   placeholder="Select Branch"
-                  contentWidth="w-[260px]"
+                  contentWidth="w-[240px]"
                   className={submitted && fieldErrors.branch_id ? "border-destructive text-destructive" : ""}
                 />
                 {submitted && fieldErrors.branch_id && (
@@ -311,7 +311,7 @@ export function RecordStockOutDialog({
                 />
               </div>
 
-              <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs font-semibold">Reference No.</Label>
                   <span className="text-[10px] text-muted-foreground font-normal">Optional</span>
@@ -326,9 +326,9 @@ export function RecordStockOutDialog({
                   <Info className="h-3 w-3 shrink-0 text-muted-foreground/70" />
                   <span className="truncate">
                     {referenceNo.trim() ? (
-                      "Using custom reference code"
+                      "Custom reference code"
                     ) : (
-                      <>Auto-generates (e.g. <span className="font-mono font-medium">SO-XXXXXX</span>) if blank</>
+                      <>Auto-generates (e.g. <span className="font-mono font-medium">SO-XXXXXX</span>)</>
                     )}
                   </span>
                 </p>
@@ -369,16 +369,16 @@ export function RecordStockOutDialog({
                 </div>
               ) : (
                 <div className="rounded-md border bg-background overflow-hidden">
-                  <div className="max-h-[340px] overflow-y-auto overflow-x-auto">
+                  <div className="max-h-[300px] overflow-y-auto overflow-x-auto">
                     <Table>
                       <TableHeader className="bg-muted/40 sticky top-0 z-10">
                         <TableRow className="text-[11px]">
-                          <TableHead className="min-w-[280px]">Part *</TableHead>
-                          <TableHead className="w-[100px] text-right">Available</TableHead>
-                          <TableHead className="w-[100px] text-right">Qty *</TableHead>
-                          <TableHead className="w-[110px] text-right">Unit Cost</TableHead>
-                          <TableHead className="w-[120px] text-right">Subtotal</TableHead>
-                          <TableHead className="w-[44px]"></TableHead>
+                          <TableHead className="min-w-[240px]">Part *</TableHead>
+                          <TableHead className="w-[85px] text-right">Available</TableHead>
+                          <TableHead className="w-[85px] text-right">Qty *</TableHead>
+                          <TableHead className="w-[100px] text-right">Unit Cost</TableHead>
+                          <TableHead className="w-[110px] text-right">Subtotal</TableHead>
+                          <TableHead className="w-[40px]"></TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -410,7 +410,7 @@ export function RecordStockOutDialog({
                                   value={row.part_id}
                                   onValueChange={(val) => handleItemChange(idx, "part_id", val)}
                                   placeholder="Select part..."
-                                  contentWidth="w-[320px]"
+                                  contentWidth="w-[300px]"
                                   className={partError ? "border-destructive text-destructive h-8 text-xs" : "h-8 text-xs"}
                                 />
                                 {partError && <p className="text-[10px] text-destructive mt-0.5">{partError}</p>}
@@ -434,7 +434,7 @@ export function RecordStockOutDialog({
                                   value={row.quantity}
                                   onChange={(e) => handleItemChange(idx, "quantity", e.target.value)}
                                   placeholder="1"
-                                  className={`h-8 text-xs font-mono text-right w-20 ml-auto ${
+                                  className={`h-8 text-xs font-mono text-right w-16 ml-auto ${
                                     qtyError ? "border-destructive focus-visible:ring-destructive" : ""
                                   }`}
                                 />

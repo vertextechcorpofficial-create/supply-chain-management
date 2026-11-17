@@ -6,6 +6,42 @@ export const runtime = "nodejs";
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const DIRECTUS_TOKEN = process.env.DIRECTUS_STATIC_TOKEN || "";
 
+let cachedTimezone: string | null = null;
+
+async function fetchDatabaseTimezone(): Promise<string> {
+  if (cachedTimezone) return cachedTimezone;
+  try {
+    const res = await fetch(`${DIRECTUS_URL}/items/general_setting?filter[setting_key][_eq]=time_zone&limit=1`, {
+      headers: directusHeaders(),
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json().catch(() => ({}));
+      const setting = json?.data?.[0];
+      if (setting?.setting_value) {
+        cachedTimezone = setting.setting_value;
+        return cachedTimezone;
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return "Asia/Manila";
+}
+
+async function getFormattedDbNow(): Promise<string> {
+  const tz = await fetchDatabaseTimezone();
+  return new Date().toLocaleString("sv-SE", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).replace(" ", "T");
+}
+
 function json(res: unknown, status = 200) {
   return NextResponse.json(res, { status });
 }
@@ -194,8 +230,8 @@ export async function GET(req: NextRequest) {
     }
 
     // Calculate low stock / reorder triggers
-    // Collect active PRs (Pending, Approved, Ordered) to prevent duplicate reorders
-    const activePrKeys = new Set<string>();
+    // Map active PRs (Pending, Approved, Ordered) to inform the trigger without hiding the deficit
+    const activePrMap = new Map<string, { id: number; pr_no: string; status: string }>();
     const activePrStatuses = new Set(["pending", "approved", "ordered"]);
 
     if (Array.isArray(prItems)) {
@@ -207,13 +243,19 @@ export async function GET(req: NextRequest) {
           ? Number((pr.branch_id as Record<string, unknown>).id)
           : Number(pr.branch_id);
 
+        const prSummary = {
+          id: Number(pr.id),
+          pr_no: String(pr.pr_no || ""),
+          status: String(pr.status || "Pending"),
+        };
+
         // Check primary part_id or linked items
         const primaryPartId = typeof pr.part_id === "object" && pr.part_id !== null
           ? Number((pr.part_id as Record<string, unknown>).id)
           : Number(pr.part_id);
 
         if (primaryPartId && prBranchId) {
-          activePrKeys.add(`${primaryPartId}-${prBranchId}`);
+          activePrMap.set(`${primaryPartId}-${prBranchId}`, prSummary);
         }
 
         const linkedItems = Array.isArray(pr.items) ? (pr.items as Record<string, unknown>[]) : [];
@@ -222,7 +264,7 @@ export async function GET(req: NextRequest) {
             ? Number((it.part_id as Record<string, unknown>).id)
             : Number(it.part_id);
           if (itPartId && prBranchId) {
-            activePrKeys.add(`${itPartId}-${prBranchId}`);
+            activePrMap.set(`${itPartId}-${prBranchId}`, prSummary);
           }
         });
       });
@@ -242,10 +284,7 @@ export async function GET(req: NextRequest) {
       const key = `${partId}-${b.id}`;
       processedPartIds.add(key);
 
-      // If already has an active PR (Pending / Approved / Ordered) for this branch, don't trigger duplicate
-      if (activePrKeys.has(key)) {
-        return;
-      }
+      const activePrInfo = activePrMap.get(key);
 
       const onHand = Number(s.on_hand) || 0;
       const reserved = Number(s.reserved) || 0;
@@ -277,6 +316,9 @@ export async function GET(req: NextRequest) {
           reorder_point: reorderPoint,
           deficit,
           suggested_quantity: suggestedQty,
+          active_pr_id: activePrInfo?.id || null,
+          active_pr_no: activePrInfo?.pr_no || null,
+          active_pr_status: activePrInfo?.status || null,
         });
       }
     });
@@ -291,10 +333,7 @@ export async function GET(req: NextRequest) {
 
       // If not yet in triggers and has no positive stock record
       if (!processedPartIds.has(key)) {
-        // Skip if already in an active PR for this branch
-        if (activePrKeys.has(key)) {
-          return;
-        }
+        const activePrInfo = activePrMap.get(key);
 
         // Check if there is any stock record for this part
         const hasStock = stockList.some((s: Record<string, unknown>) => {
@@ -323,6 +362,9 @@ export async function GET(req: NextRequest) {
             reorder_point: reorderPoint,
             deficit: reorderPoint,
             suggested_quantity: targetStock,
+            active_pr_id: activePrInfo?.id || null,
+            active_pr_no: activePrInfo?.pr_no || null,
+            active_pr_status: activePrInfo?.status || null,
           });
         }
       }
@@ -383,7 +425,7 @@ export async function POST(req: NextRequest) {
 
     const prNo = `PR-${Date.now().toString().slice(-6)}`;
     const currentUserId = getUserIdFromRequest(req);
-    const nowIso = new Date().toISOString();
+    const nowIso = await getFormattedDbNow();
 
     const prRecord: Record<string, unknown> = {
       pr_no: prNo,
@@ -500,7 +542,7 @@ export async function PATCH(req: NextRequest) {
         }];
 
     const currentUserId = getUserIdFromRequest(req);
-    const nowIso = new Date().toISOString();
+    const nowIso = await getFormattedDbNow();
 
     // 1. Approve Action
     if (action === "approve") {
@@ -541,15 +583,20 @@ export async function PATCH(req: NextRequest) {
         headers: directusHeaders(),
         body: JSON.stringify({
           status: "Received",
-          received_at: new Date().toISOString(),
+          received_at: nowIso,
         }),
       });
 
       // b. Process each item in the purchase request
+      const targetBranchId = branchId || 1;
+
       for (const item of prItemsList) {
-        const partId = typeof item.part_id === "object" && item.part_id !== null ? Number(item.part_id.id) : Number(item.part_id);
+        const rawPart = item.part_id;
+        const partId = typeof rawPart === "object" && rawPart !== null
+          ? Number(rawPart.id ?? (rawPart as { part_id?: number }).part_id)
+          : Number(rawPart);
         const qty = Number(item.quantity) || 0;
-        const cost = Number(item.unit_cost || (typeof item.part_id === "object" ? item.part_id.unit_cost : 0)) || 0;
+        const cost = Number(item.unit_cost || (typeof rawPart === "object" && rawPart !== null ? (rawPart as { unit_cost?: number }).unit_cost : 0)) || 0;
 
         if (!partId || qty <= 0) continue;
 
@@ -559,36 +606,25 @@ export async function PATCH(req: NextRequest) {
           headers: directusHeaders(),
           body: JSON.stringify({
             part_id: partId,
-            branch_id: branchId || 1,
+            branch_id: targetBranchId,
             movement_type: "Stock In",
             quantity: qty,
             unit_cost: cost,
             reference_no: prNo,
             remarks: `Received via Purchase Request ${prNo}`,
-            created_at: new Date().toISOString(),
+            created_at: nowIso,
           }),
         }).catch(() => null);
 
-        // Increase on_hand in vehicle_part_stock
-        const stockFilter = branchId
-          ? `filter[part_id][_eq]=${partId}&filter[branch_id][_eq]=${branchId}&limit=1`
-          : `filter[part_id][_eq]=${partId}&limit=1`;
+        // Increase on_hand strictly in vehicle_part_stock for this target branch
+        const stockFilter = `filter[part_id][_eq]=${partId}&filter[branch_id][_eq]=${targetBranchId}&limit=1`;
 
         const stockRes = await fetch(`${DIRECTUS_URL}/items/vehicle_part_stock?${stockFilter}`, {
           cache: "no-store",
           headers: directusHeaders(),
         });
         const stockData = await stockRes.json().catch(() => ({ data: [] }));
-        let existingStock = stockData.data?.[0];
-
-        if (!existingStock) {
-          const fallbackRes = await fetch(`${DIRECTUS_URL}/items/vehicle_part_stock?filter[part_id][_eq]=${partId}&limit=1`, {
-            cache: "no-store",
-            headers: directusHeaders(),
-          });
-          const fbData = await fallbackRes.json().catch(() => ({ data: [] }));
-          existingStock = fbData.data?.[0];
-        }
+        const existingStock = stockData?.data?.[0];
 
         if (existingStock) {
           const currentOnHand = Number(existingStock.on_hand) || 0;
@@ -600,13 +636,13 @@ export async function PATCH(req: NextRequest) {
             }),
           });
         } else {
-          // Create initial stock entry if not exists
+          // Create initial stock entry strictly for the target branch
           await fetch(`${DIRECTUS_URL}/items/vehicle_part_stock`, {
             method: "POST",
             headers: directusHeaders(),
             body: JSON.stringify({
               part_id: partId,
-              branch_id: branchId || 1,
+              branch_id: targetBranchId,
               on_hand: qty,
               reserved: 0,
             }),
@@ -630,14 +666,14 @@ export async function PUT(req: NextRequest) {
     if (!DIRECTUS_URL) throw new Error("NEXT_PUBLIC_API_BASE_URL is not configured");
 
     const payload = await req.json();
-    const { id, branch_id, part_id, quantity, estimated_cost, priority, supplier_id, supplier_name, expected_delivery_date, notes } = payload;
+    const { id, branch_id, part_id, quantity, estimated_cost, priority, supplier_id, supplier_name, expected_delivery_date, notes, items } = payload;
 
     if (!id) {
       return json({ error: "Purchase Request ID is required for updating." }, 400);
     }
 
     // Fetch existing PR record to verify status
-    const getRes = await fetch(`${DIRECTUS_URL}/items/vehicle_part_purchase_requests/${id}?fields=id,status,created_by,requested_by`, {
+    const getRes = await fetch(`${DIRECTUS_URL}/items/vehicle_part_purchase_requests/${id}?fields=id,status,created_by,requested_by,pr_no`, {
       cache: "no-store",
       headers: directusHeaders(),
     });
@@ -661,17 +697,45 @@ export async function PUT(req: NextRequest) {
       }, 403);
     }
 
+    // Handle items list if provided (multi-part edit)
+    let requestItems: { part_id: number; quantity: number; unit_cost?: number; remarks?: string }[] | null = null;
+    if (Array.isArray(items) && items.length > 0) {
+      requestItems = items
+        .map((it: { part_id: number | string; quantity: number | string; unit_cost?: number | string; remarks?: string }) => ({
+          part_id: Number(it.part_id),
+          quantity: Number(it.quantity),
+          unit_cost: Number(it.unit_cost || 0),
+          remarks: it.remarks || "",
+        }))
+        .filter((it) => it.part_id > 0 && it.quantity > 0);
+    }
+
     // Prepare update payload
     const updateBody: Record<string, unknown> = {};
     if (branch_id !== undefined) updateBody.branch_id = Number(branch_id);
-    if (part_id !== undefined) updateBody.part_id = Number(part_id);
-    if (quantity !== undefined) updateBody.quantity = Number(quantity);
-    if (estimated_cost !== undefined) updateBody.estimated_cost = Number(estimated_cost);
+
+    if (requestItems && requestItems.length > 0) {
+      const firstItem = requestItems[0];
+      const totalQty = requestItems.reduce((acc, it) => acc + it.quantity, 0);
+      const totalEstCost = estimated_cost !== undefined
+        ? Number(estimated_cost)
+        : requestItems.reduce((acc, it) => acc + (it.quantity * (it.unit_cost || 0)), 0);
+
+      updateBody.part_id = firstItem.part_id;
+      updateBody.quantity = totalQty;
+      updateBody.estimated_cost = totalEstCost;
+    } else {
+      if (part_id !== undefined) updateBody.part_id = Number(part_id);
+      if (quantity !== undefined) updateBody.quantity = Number(quantity);
+      if (estimated_cost !== undefined) updateBody.estimated_cost = Number(estimated_cost);
+    }
+
     if (priority !== undefined) updateBody.priority = priority;
     if (supplier_id !== undefined) updateBody.supplier_id = supplier_id ? Number(supplier_id) : null;
     if (supplier_name !== undefined) updateBody.supplier_name = supplier_name;
     if (expected_delivery_date !== undefined) updateBody.expected_delivery_date = expected_delivery_date || null;
     if (notes !== undefined) updateBody.notes = notes;
+    updateBody.updated_at = await getFormattedDbNow();
 
     const updateRes = await fetch(`${DIRECTUS_URL}/items/vehicle_part_purchase_requests/${id}`, {
       method: "PATCH",
@@ -682,6 +746,48 @@ export async function PUT(req: NextRequest) {
     if (!updateRes.ok) {
       const errorJson = await updateRes.json().catch(() => ({}));
       return json({ error: errorJson?.errors?.[0]?.message || "Failed to update purchase request." }, updateRes.status);
+    }
+
+    // Synchronize items in vehicle_part_purchase_request_items if items array was supplied
+    if (requestItems && requestItems.length > 0) {
+      // Find existing items to clean up
+      const oldItemsRes = await fetch(
+        `${DIRECTUS_URL}/items/vehicle_part_purchase_request_items?filter[purchase_request_id][_eq]=${id}&limit=-1&fields=id`,
+        { headers: directusHeaders(), cache: "no-store" }
+      ).catch(() => null);
+
+      if (oldItemsRes && oldItemsRes.ok) {
+        const oldItemsJson = await oldItemsRes.json().catch(() => ({ data: [] }));
+        const oldItemIds = Array.isArray(oldItemsJson?.data)
+          ? oldItemsJson.data.map((oi: { id: number }) => oi.id)
+          : [];
+
+        // Delete existing items
+        if (oldItemIds.length > 0) {
+          await fetch(`${DIRECTUS_URL}/items/vehicle_part_purchase_request_items`, {
+            method: "DELETE",
+            headers: directusHeaders(),
+            body: JSON.stringify(oldItemIds),
+          }).catch(() => null);
+        }
+      }
+
+      // Insert updated items
+      const prNo = pr.pr_no || `PR-#${id}`;
+      await Promise.all(
+        requestItems.map((it) =>
+          fetch(`${DIRECTUS_URL}/items/vehicle_part_purchase_request_items`, {
+            method: "POST",
+            headers: directusHeaders(),
+            body: JSON.stringify({
+              purchase_request_id: id,
+              part_id: it.part_id,
+              quantity: it.quantity,
+              remarks: it.remarks || notes || `Ordered for ${prNo}`,
+            }),
+          }).catch(() => null)
+        )
+      );
     }
 
     const updatedData = await updateRes.json().catch(() => ({}));
