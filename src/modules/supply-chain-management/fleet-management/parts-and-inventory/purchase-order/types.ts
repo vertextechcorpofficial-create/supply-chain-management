@@ -21,6 +21,9 @@ export interface ReorderTriggerItem {
   reorder_point: number;
   deficit: number;
   suggested_quantity: number;
+  active_pr_id?: number | null;
+  active_pr_no?: string | null;
+  active_pr_status?: string | null;
 }
 
 export interface Supplier {
@@ -71,6 +74,7 @@ export interface UpdatePurchaseRequestPayload {
   supplier_name?: string | null;
   expected_delivery_date?: string | null;
   notes?: string | null;
+  items?: BulkPurchaseRequestItem[];
 }
 
 export interface CreatePurchaseRequestPayload {

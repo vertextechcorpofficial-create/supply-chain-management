@@ -25,12 +25,13 @@ import type { VehiclePart } from "../../registration/types";
 import type { ReorderTriggerItem, PurchaseRequestPriority, Supplier, PurchaseRequest } from "../types";
 import { createPurchaseRequest, updatePurchaseRequest } from "../provider/fetchProviders";
 import { SearchableSelect } from "./SearchableSelect";
-import { AlertCircle, Calendar as CalendarIcon, Loader2, ShoppingCart, X } from "lucide-react";
+import { AlertCircle, Calendar as CalendarIcon, Loader2, ShoppingCart, X, Info } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface CreatePurchaseRequestDialogProps {
   open: boolean;
@@ -214,6 +215,7 @@ export function CreatePurchaseRequestDialog({
           expected_delivery_date: expectedDate || undefined,
           notes: notes.trim() || undefined,
         });
+        toast.success("Purchase request updated successfully.");
       } else {
         await createPurchaseRequest({
           branch_id: Number(branchId),
@@ -226,6 +228,7 @@ export function CreatePurchaseRequestDialog({
           expected_delivery_date: expectedDate || undefined,
           notes: notes.trim() || undefined,
         });
+        toast.success("Purchase request created successfully.");
       }
 
       onSuccess();
@@ -243,10 +246,21 @@ export function CreatePurchaseRequestDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle className="text-base flex items-center gap-2">
-            <ShoppingCart className="h-4 w-4 text-primary" />
-            {isEditMode ? `Edit Purchase Request (${editPr?.pr_no})` : "Create Purchase Request / Replenishment"}
-          </DialogTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 pr-6">
+            <DialogTitle className="text-base flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4 text-primary" />
+              {isEditMode ? `Edit Purchase Request (${editPr?.pr_no})` : "Create Purchase Request / Replenishment"}
+            </DialogTitle>
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground bg-muted/60 border rounded-md px-2 py-0.5">
+              <Info className="h-3 w-3 text-primary shrink-0" />
+              <span>
+                Ref:{" "}
+                <strong className="font-mono text-foreground font-semibold">
+                  {isEditMode ? editPr?.pr_no : "Auto-generated (PR-XXXXXX)"}
+                </strong>
+              </span>
+            </div>
+          </div>
           <DialogDescription className="text-xs">
             {isEditMode
               ? "Modify the details of this pending purchase request before approval."

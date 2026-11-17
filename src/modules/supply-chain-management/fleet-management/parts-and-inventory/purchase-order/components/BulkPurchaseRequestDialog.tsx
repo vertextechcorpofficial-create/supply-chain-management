@@ -29,17 +29,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SearchableSelect } from "./SearchableSelect";
-import { AlertCircle, Calendar as CalendarIcon, Loader2, Plus, ShoppingCart, Trash2, X } from "lucide-react";
+import { AlertCircle, Calendar as CalendarIcon, Loader2, Plus, ShoppingCart, Trash2, X, Info } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
-import type { ReorderTriggerItem, PurchaseRequestPriority, Supplier } from "../types";
+import { toast } from "sonner";
+import type { ReorderTriggerItem, PurchaseRequestPriority, Supplier, PurchaseRequest } from "../types";
 import type { Branch } from "../../stock-in/types";
 import type { VehiclePart } from "../../registration/types";
 import type { PartStock } from "../../stock-monitoring/types";
-import { createPurchaseRequest } from "../provider/fetchProviders";
+import { createPurchaseRequest, updatePurchaseRequest } from "../provider/fetchProviders";
 import { fetchStockRecords } from "../../stock-monitoring/provider/fetchProviders";
 
 interface BulkPurchaseRequestDialogProps {
@@ -49,6 +50,7 @@ interface BulkPurchaseRequestDialogProps {
   branches: Branch[];
   parts?: VehiclePart[];
   suppliers?: Supplier[];
+  editPr?: PurchaseRequest | null;
   onSuccess: () => void;
 }
 
@@ -94,8 +96,10 @@ export function BulkPurchaseRequestDialog({
   branches,
   parts = [],
   suppliers = [],
+  editPr,
   onSuccess,
 }: BulkPurchaseRequestDialogProps) {
+  const isEditMode = Boolean(editPr);
   const [items, setItems] = React.useState<EditableBulkItem[]>([]);
   const [branchId, setBranchId] = React.useState<string>("");
   const [priority, setPriority] = React.useState<PurchaseRequestPriority>("Normal");
@@ -149,41 +153,86 @@ export function BulkPurchaseRequestDialog({
       setExpectedDate("");
       setNotes("");
 
-      // Default branch from first item, or first available branch
-      let defaultBranch = "";
-      if (selectedItems.length > 0) {
-        defaultBranch = String(selectedItems[0].branch_id);
-      } else if (branches.length > 0) {
-        defaultBranch = String(branches[0].id);
+      if (editPr) {
+        // --- Populate from existing PR being edited ---
+        const bId = typeof editPr.branch_id === "object" && editPr.branch_id !== null ? String(editPr.branch_id.id) : String(editPr.branch_id || "");
+        const sId = typeof editPr.supplier_id === "object" && editPr.supplier_id !== null ? String(editPr.supplier_id.id) : String(editPr.supplier_id || "");
+        setBranchId(bId);
+        setPriority(editPr.priority || "Normal");
+        setSupplierId(sId);
+        setExpectedDate(editPr.expected_delivery_date ? editPr.expected_delivery_date.slice(0, 10) : "");
+        setNotes(editPr.notes || "");
+
+        // Build items list from editPr.items or editPr.part_id
+        if (Array.isArray(editPr.items) && editPr.items.length > 0) {
+          const mappedItems: EditableBulkItem[] = editPr.items.map((it) => {
+            const partObj = typeof it.part_id === "object" && it.part_id !== null ? (it.part_id as VehiclePart) : parts.find((p) => p.id === Number(it.part_id));
+            const pId = partObj ? Number(partObj.id) : Number(it.part_id);
+            return {
+              part_id: pId,
+              part_code: partObj?.part_code || `PRT-${pId}`,
+              part_name: partObj?.part_name || "Unknown Part",
+              unit: partObj?.unit || "pc",
+              unit_cost: Number(it.unit_cost ?? partObj?.unit_cost ?? 0),
+              on_hand: 0,
+              quantity: Number(it.quantity) || 1,
+            };
+          });
+          setItems(mappedItems);
+        } else if (editPr.part_id) {
+          const partObj = typeof editPr.part_id === "object" && editPr.part_id !== null ? (editPr.part_id as VehiclePart) : parts.find((p) => p.id === Number(editPr.part_id));
+          const pId = partObj ? Number(partObj.id) : Number(editPr.part_id);
+          setItems([
+            {
+              part_id: pId,
+              part_code: partObj?.part_code || `PRT-${pId}`,
+              part_name: partObj?.part_name || "Unknown Part",
+              unit: partObj?.unit || "pc",
+              unit_cost: Number(partObj?.unit_cost || 0),
+              on_hand: 0,
+              quantity: Number(editPr.quantity) || 1,
+            },
+          ]);
+        } else {
+          setItems([]);
+        }
+      } else {
+        // --- Populate from trigger selection or new blank ---
+        let defaultBranch = "";
+        if (selectedItems.length > 0) {
+          defaultBranch = String(selectedItems[0].branch_id);
+        } else if (branches.length > 0) {
+          defaultBranch = String(branches[0].id);
+        }
+        setBranchId(defaultBranch);
+
+        // Initialize items from selection
+        const initItems: EditableBulkItem[] = selectedItems.map((t) => ({
+          part_id: t.part_id,
+          part_code: t.part_code,
+          part_name: t.part_name,
+          unit: t.unit || "pc",
+          unit_cost: Number(t.unit_cost) || 0,
+          on_hand: t.branch_id && defaultBranch && String(t.branch_id) === defaultBranch ? t.on_hand : 0,
+          quantity: Math.max(1, t.suggested_quantity || 10),
+        }));
+        setItems(initItems);
+
+        // Auto-populate supplier from the first selected part if pre-configured
+        let autoSupplierId = "";
+        if (selectedItems.length > 0) {
+          const firstPartId = selectedItems[0].part_id;
+          const matchingPart = parts.find((p) => p.id === firstPartId);
+          autoSupplierId = getPartSupplierId(matchingPart);
+        }
+        setSupplierId(autoSupplierId);
+
+        // If any critical, default to Critical/Urgent
+        const hasCritical = selectedItems.some((i) => i.on_hand <= 0);
+        setPriority(hasCritical ? "Critical" : "Normal");
       }
-      setBranchId(defaultBranch);
-
-      // Initialize items from selection
-      const initItems: EditableBulkItem[] = selectedItems.map((t) => ({
-        part_id: t.part_id,
-        part_code: t.part_code,
-        part_name: t.part_name,
-        unit: t.unit || "pc",
-        unit_cost: Number(t.unit_cost) || 0,
-        on_hand: t.branch_id && defaultBranch && String(t.branch_id) === defaultBranch ? t.on_hand : 0,
-        quantity: Math.max(1, t.suggested_quantity || 10),
-      }));
-      setItems(initItems);
-
-      // Auto-populate supplier from the first selected part if pre-configured
-      let autoSupplierId = "";
-      if (selectedItems.length > 0) {
-        const firstPartId = selectedItems[0].part_id;
-        const matchingPart = parts.find((p) => p.id === firstPartId);
-        autoSupplierId = getPartSupplierId(matchingPart);
-      }
-      setSupplierId(autoSupplierId);
-
-      // If any critical, default to Critical/Urgent
-      const hasCritical = selectedItems.some((i) => i.on_hand <= 0);
-      setPriority(hasCritical ? "Critical" : "Normal");
     }
-  }, [open, selectedItems, branches, parts]);
+  }, [open, editPr, selectedItems, branches, parts]);
 
   // When branchId or stockMap updates, sync on_hand for all items
   React.useEffect(() => {
@@ -312,27 +361,48 @@ export function BulkPurchaseRequestDialog({
 
     setSubmitting(true);
     try {
-      await createPurchaseRequest({
-        branch_id: Number(branchId),
-        priority,
-        supplier_id: Number(supplierId),
-        supplier_name: selectedSupplier ? selectedSupplier.supplier_name : undefined,
-        expected_delivery_date: expectedDate || undefined,
-        notes: notes.trim() || `Bulk Purchase Request (${items.length} items)`,
-        estimated_cost: totalEstimatedCost,
-        items: items.map((it) => ({
-          part_id: it.part_id,
-          quantity: it.quantity,
-          unit_cost: it.unit_cost,
-          remarks: `Bulk PO item`,
-        })),
-      });
+      if (isEditMode && editPr) {
+        await updatePurchaseRequest({
+          id: editPr.id,
+          branch_id: Number(branchId),
+          priority,
+          supplier_id: Number(supplierId),
+          supplier_name: selectedSupplier ? selectedSupplier.supplier_name : undefined,
+          expected_delivery_date: expectedDate || undefined,
+          notes: notes.trim() || undefined,
+          estimated_cost: totalEstimatedCost,
+          items: items.map((it) => ({
+            part_id: it.part_id,
+            quantity: it.quantity,
+            unit_cost: it.unit_cost,
+            remarks: `PO item`,
+          })),
+        });
+        toast.success(`Purchase request ${editPr.pr_no} updated successfully with ${items.length} items.`);
+      } else {
+        await createPurchaseRequest({
+          branch_id: Number(branchId),
+          priority,
+          supplier_id: Number(supplierId),
+          supplier_name: selectedSupplier ? selectedSupplier.supplier_name : undefined,
+          expected_delivery_date: expectedDate || undefined,
+          notes: notes.trim() || `Bulk Purchase Request (${items.length} items)`,
+          estimated_cost: totalEstimatedCost,
+          items: items.map((it) => ({
+            part_id: it.part_id,
+            quantity: it.quantity,
+            unit_cost: it.unit_cost,
+            remarks: `Bulk PO item`,
+          })),
+        });
+        toast.success(`Consolidated purchase request with ${items.length} items created successfully.`);
+      }
 
       onSuccess();
       onOpenChange(false);
     } catch (err: unknown) {
       const e = err as Error;
-      setError(e.message || "Failed to create bulk purchase request");
+      setError(e.message || (isEditMode ? "Failed to update purchase request" : "Failed to create bulk purchase request"));
     } finally {
       setSubmitting(false);
     }
@@ -342,12 +412,25 @@ export function BulkPurchaseRequestDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl sm:max-w-3xl max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="text-base flex items-center gap-2">
-            <ShoppingCart className="h-4 w-4 text-primary" />
-            Bulk Purchase Request / Replenishment
-          </DialogTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5 pr-6">
+            <DialogTitle className="text-base flex items-center gap-2">
+              <ShoppingCart className="h-4 w-4 text-primary" />
+              {isEditMode ? `Edit Purchase Request (${editPr?.pr_no})` : "Bulk Purchase Request / Replenishment"}
+            </DialogTitle>
+            <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground bg-muted/60 border rounded-md px-2 py-0.5">
+              <Info className="h-3 w-3 text-primary shrink-0" />
+              <span>
+                Ref:{" "}
+                <strong className="font-mono text-foreground font-semibold">
+                  {isEditMode ? editPr?.pr_no : "Auto-generated (PR-XXXXXX)"}
+                </strong>
+              </span>
+            </div>
+          </div>
           <DialogDescription className="text-xs">
-            Review selected parts and create a single consolidated purchase order.
+            {isEditMode
+              ? "Add, remove, or modify parts and quantities for this pending purchase order."
+              : "Review selected parts and create a single consolidated purchase order."}
           </DialogDescription>
         </DialogHeader>
 
@@ -593,12 +676,14 @@ export function BulkPurchaseRequestDialog({
               {submitting ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Submitting Order...
+                  {isEditMode ? "Saving Changes..." : "Submitting Order..."}
                 </>
               ) : (
                 <>
                   <ShoppingCart className="h-3.5 w-3.5" />
-                  Submit Consolidated PO ({items.length} parts)
+                  {isEditMode
+                    ? `Save Changes (${items.length} parts)`
+                    : `Submit Consolidated PO (${items.length} parts)`}
                 </>
               )}
             </Button>

@@ -3,6 +3,7 @@ import type { PurchaseRequest, ReorderTriggerItem, Supplier } from "../types";
 import type { Branch } from "../../stock-in/types";
 import type { VehiclePart } from "../../registration/types";
 import { fetchReorderTriggersAndPRs, fetchBranches, fetchParts, updatePurchaseRequestStatus } from "../provider/fetchProviders";
+import { toast } from "sonner";
 
 export function usePurchaseOrderModule() {
   const [prs, setPrs] = React.useState<PurchaseRequest[]>([]);
@@ -54,35 +55,54 @@ export function usePurchaseOrderModule() {
     try {
       setActionLoading(true);
       await updatePurchaseRequestStatus(id, action);
+      const actionLabels = {
+        approve: "Purchase request approved successfully.",
+        receive: "Stock received and inventoried successfully.",
+        cancel: "Purchase request cancelled.",
+      };
+      toast.success(actionLabels[action] || "Status updated successfully.");
       await loadTriggersAndPrs();
       return true;
     } catch (e: unknown) {
       const err = e as Error;
-      alert(err.message || "Failed to update status");
+      toast.error(err.message || "Failed to update status");
       return false;
     } finally {
       setActionLoading(false);
     }
   };
 
-  // Active PRs key set (Pending, Approved, Ordered) to prevent duplicate reorders for the specific branch
-  const activePrKeys = React.useMemo(() => {
-    const keys = new Set<string>();
+  // Map active PRs (Pending, Approved, Ordered) to enrich triggers with their active PR state
+  const activePrMap = React.useMemo(() => {
+    const map = new Map<string, { id: number; pr_no: string; status: string }>();
     const activeStatuses = new Set(["pending", "approved", "ordered"]);
     prs.forEach((p) => {
       if (!activeStatuses.has(String(p.status || "").toLowerCase().trim())) return;
       const bId = typeof p.branch_id === "object" && p.branch_id !== null ? p.branch_id.id : p.branch_id;
       const pId = typeof p.part_id === "object" && p.part_id !== null ? p.part_id.id : p.part_id;
-      if (pId && bId) keys.add(`${pId}-${bId}`);
+      if (pId && bId) {
+        map.set(`${pId}-${bId}`, {
+          id: p.id,
+          pr_no: p.pr_no,
+          status: p.status,
+        });
+      }
     });
-    return keys;
+    return map;
   }, [prs]);
 
-  // Filter triggers: only include items that don't have active PRs in that branch, and filter by selectedBranch
+  // Keep all low-stock triggers in the ledger even if a PR is pending,
+  // enriching each trigger with active PR tracking details.
   const availableTriggers = React.useMemo(() => {
-    let list = triggers.filter((t) => {
+    let list = triggers.map((t) => {
       const key = `${t.part_id}-${t.branch_id}`;
-      return !activePrKeys.has(key);
+      const prInfo = activePrMap.get(key);
+      return {
+        ...t,
+        active_pr_id: prInfo?.id ?? t.active_pr_id ?? null,
+        active_pr_no: prInfo?.pr_no ?? t.active_pr_no ?? null,
+        active_pr_status: prInfo?.status ?? t.active_pr_status ?? null,
+      };
     });
 
     if (selectedBranch && selectedBranch !== "all") {
@@ -95,7 +115,7 @@ export function usePurchaseOrderModule() {
     }
 
     return list;
-  }, [triggers, activePrKeys, selectedBranch]);
+  }, [triggers, activePrMap, selectedBranch]);
 
   // Filter triggers by search query
   const filteredTriggers = React.useMemo(() => {
