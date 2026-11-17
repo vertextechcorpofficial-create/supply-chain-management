@@ -22,7 +22,7 @@ import { sopRolePaths, sopWorkspaceScreens, type SopRole } from './permissions';
 import { useSopAccess, SopWorkspaceScope } from './components/SopAccessProvider';
 import { cn } from '@/lib/utils';
 
-const tabs = [{ key: 'overview', label: 'Overview', icon: LayoutDashboard }, { key: 'audits', label: 'Compliance audits', icon: ClipboardCheck }, { key: 'checklists', label: 'Checklists', icon: ListChecks }, { key: 'corrective-actions', label: 'Corrective actions', icon: Wrench }, { key: 'schedules', label: 'Schedules', icon: CalendarDays }];
+const tabs = [{ key: 'overview', label: 'Overview', icon: LayoutDashboard }, { key: 'schedules', label: 'Schedules', icon: CalendarDays }, { key: 'audits', label: 'Compliance audits', icon: ClipboardCheck }, { key: 'checklists', label: 'Checklists', icon: ListChecks }, { key: 'corrective-actions', label: 'Corrective actions', icon: Wrench }];
 export default function SopSafetyModule({ initialTab = 'overview', workspace }: { initialTab?: string; workspace: SopRole }) {
     // Each sidebar destination owns its workspace. No automatic role selection,
     // cross-role tabs, or in-screen user-type switcher is exposed.
