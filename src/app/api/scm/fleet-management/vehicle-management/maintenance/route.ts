@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { getFormattedDbNow, getDbDatePart } from "../timezone-utils";
 
 export const runtime = "nodejs";
 
@@ -227,7 +228,7 @@ export async function POST(req: NextRequest) {
       const effectiveRequestedBy = requested_by ? Number(requested_by) : tokenUserId;
 
       // Generate a unique jo_no: JO-YYYYMMDD-XXXX
-      const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+      const datePart = await getDbDatePart();
       const randPart = Math.floor(1000 + Math.random() * 9000);
       const jo_no = `JO-${datePart}-${randPart}`;
 
@@ -265,6 +266,8 @@ export async function POST(req: NextRequest) {
         }
       }
 
+      const dbNow = await getFormattedDbNow();
+
       const joPayload: Record<string, unknown> = {
         jo_no,
         vehicle_id: Number(vehicle_id),
@@ -274,8 +277,8 @@ export async function POST(req: NextRequest) {
         odometer_reading: odometer_reading ? Number(odometer_reading) : null,
         status: "Requested",
         requested_by: effectiveRequestedBy ? Number(effectiveRequestedBy) : null,
-        requested_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
+        requested_at: dbNow,
+        created_at: dbNow,
       };
 
       if (validBranchId) {
@@ -374,6 +377,8 @@ export async function PATCH(req: NextRequest) {
       return json({ error: "job_order_id is required." }, 400);
     }
 
+    const dbNow = await getFormattedDbNow();
+
     // 0. Update JO Request (When status is Requested)
     if (action === "update_request") {
       const { vehicle_id, branch_id, jo_type, priority, description, odometer_reading, parts } = payload;
@@ -391,7 +396,6 @@ export async function PATCH(req: NextRequest) {
         return json({ error: "Only Job Orders in Requested status can be edited." }, 400);
       }
 
-      const utcNow = new Date().toISOString();
       const updateJoData: Record<string, unknown> = {
         vehicle_id: Number(vehicle_id),
         branch_id: Number(branch_id || existingJo.branch_id || 1),
@@ -399,7 +403,7 @@ export async function PATCH(req: NextRequest) {
         priority: priority || "Normal",
         description,
         odometer_reading: odometer_reading ? Number(odometer_reading) : null,
-        updated_at: utcNow,
+        updated_at: dbNow,
       };
 
       const userToken = req.cookies.get(COOKIE_NAME)?.value;
@@ -518,7 +522,7 @@ export async function PATCH(req: NextRequest) {
       const updatePayload: Record<string, unknown> = {
         status,
         approved_by: approved_by ? Number(approved_by) : null,
-        approved_at: new Date().toISOString(),
+        approved_at: dbNow,
         decision_remarks: decision_remarks || "",
       };
 
@@ -599,7 +603,7 @@ export async function PATCH(req: NextRequest) {
         headers: directusHeaders(),
         body: JSON.stringify({
           status: "In Progress",
-          started_at: new Date().toISOString(),
+          started_at: dbNow,
         }),
       });
 
@@ -635,7 +639,7 @@ export async function PATCH(req: NextRequest) {
             vehicle_id: vehicleId ? Number(vehicleId) : null,
             reference_no: joNo,
             remarks: jp.remarks || `Auto-issued upon Start Maintenance (${joNo})`,
-            created_at: new Date().toISOString(),
+            created_at: dbNow,
           }),
         }).catch(() => null);
 
@@ -679,7 +683,7 @@ export async function PATCH(req: NextRequest) {
           headers: directusHeaders(),
           body: JSON.stringify({
             quantity_issued: issuedQty + qtyToIssue,
-            issued_at: new Date().toISOString(),
+            issued_at: dbNow,
           }),
         }).catch(() => null);
 
@@ -692,7 +696,7 @@ export async function PATCH(req: NextRequest) {
               vehicle_id: Number(vehicleId),
               part_id: partId,
               quantity: qtyToIssue,
-              installed_at: new Date().toISOString(),
+              installed_at: dbNow,
               job_order_id: Number(job_order_id),
               notes: `Installed via Job Order ${joNo}`,
             }),
@@ -806,7 +810,7 @@ export async function PATCH(req: NextRequest) {
             body: JSON.stringify({
               quantity_issued: (Number(existingJop.quantity_issued) || 0) + qty,
               issued_by: issued_by ? Number(issued_by) : null,
-              issued_at: new Date().toISOString(),
+              issued_at: dbNow,
             }),
           });
         } else {
@@ -820,7 +824,7 @@ export async function PATCH(req: NextRequest) {
               quantity_issued: qty,
               unit_cost: cost,
               issued_by: issued_by ? Number(issued_by) : null,
-              issued_at: new Date().toISOString(),
+              issued_at: dbNow,
               remarks: itemRemarks,
             }),
           });
@@ -836,7 +840,7 @@ export async function PATCH(req: NextRequest) {
               part_id: partId,
               quantity: qty,
               job_order_id: Number(job_order_id),
-              installed_at: new Date().toISOString(),
+              installed_at: dbNow,
               remarks: itemRemarks,
             }),
           }).catch(() => null);
@@ -856,7 +860,7 @@ export async function PATCH(req: NextRequest) {
         headers: directusHeaders(),
         body: JSON.stringify({
           status: "Completed",
-          completed_at: new Date().toISOString(),
+          completed_at: dbNow,
           completion_remarks: completion_remarks || "",
           labor_cost: labor_cost ? Number(labor_cost) : 0,
         }),

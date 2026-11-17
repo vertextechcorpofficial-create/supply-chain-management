@@ -1,4 +1,5 @@
 import * as React from "react";
+import { toast } from "sonner";
 import type { IssuePartsInput, JobOrderPart, JobOrderRef } from "../types";
 import type { VehiclePart } from "../../registration/types";
 import type { Branch } from "../../stock-in/types";
@@ -53,11 +54,14 @@ export function useReserveModule() {
     try {
       setSaving(true);
       await issuePartsToJobOrder(payload);
+      toast.success("Parts successfully issued to Job Order!");
       await loadData();
       return true;
     } catch (err: unknown) {
       const e = err as Error;
-      setError(e?.message || "Failed to issue parts");
+      const msg = e?.message || "Failed to issue parts";
+      setError(msg);
+      toast.error(msg);
       return false;
     } finally {
       setSaving(false);

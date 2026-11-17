@@ -6,6 +6,44 @@ export const runtime = "nodejs";
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const DIRECTUS_TOKEN = process.env.DIRECTUS_STATIC_TOKEN || "";
 
+let cachedTimezone: string | null = null;
+
+async function fetchDatabaseTimezone(): Promise<string> {
+  if (cachedTimezone) return cachedTimezone;
+  try {
+    const res = await fetch(`${DIRECTUS_URL}/items/general_setting?filter[setting_key][_eq]=time_zone&limit=1`, {
+      headers: directusHeaders(),
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json().catch(() => ({}));
+      const setting = json?.data?.[0];
+      const val = setting?.setting_value;
+      if (typeof val === "string" && val.trim().length > 0) {
+        const tz = val.trim();
+        cachedTimezone = tz;
+        return tz;
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return "Asia/Manila";
+}
+
+async function getFormattedDbNow(): Promise<string> {
+  const tz = await fetchDatabaseTimezone();
+  return new Date().toLocaleString("sv-SE", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).replace(" ", "T");
+}
+
 function json(res: unknown, status = 200) {
   return NextResponse.json(res, { status });
 }
@@ -123,7 +161,7 @@ export async function POST(req: NextRequest) {
     }
 
     const currentUserId = getUserIdFromRequest(req);
-    const nowIso = new Date().toISOString();
+    const dbNow = await getFormattedDbNow();
 
     // 1. Fetch Job Order details for vehicle reference and jo_no
     const joRes = await fetch(`${DIRECTUS_URL}/items/vehicle_job_orders/${job_order_id}?fields=*,vehicle_id.*`, {
@@ -190,7 +228,7 @@ export async function POST(req: NextRequest) {
         reference_no: joNo,
         remarks: itemRemarks,
         created_by: currentUserId || null,
-        created_at: nowIso,
+        created_at: dbNow,
       };
 
       const movRes = await fetch(`${DIRECTUS_URL}/items/vehicle_part_movements`, {
@@ -230,37 +268,82 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // c. Record in vehicle_job_order_parts
-      const joPartPayload: Record<string, unknown> = {
-        job_order_id: Number(job_order_id),
-        part_id: partId,
-        quantity_requested: qty,
-        quantity_issued: qty,
-        unit_cost: cost,
-        issued_at: nowIso,
-        remarks: itemRemarks,
-        created_by: currentUserId || null,
-      };
-
-      const jopRes = await fetch(`${DIRECTUS_URL}/items/vehicle_job_order_parts`, {
-        method: "POST",
+      // c. Check if already exists in vehicle_job_order_parts, then update or create
+      const jopCheckUrl = `${DIRECTUS_URL}/items/vehicle_job_order_parts?filter[job_order_id][_eq]=${job_order_id}&filter[part_id][_eq]=${partId}&limit=1`;
+      const jopCheckRes = await fetch(jopCheckUrl, {
+        cache: "no-store",
         headers: directusHeaders(),
-        body: JSON.stringify(joPartPayload),
       });
+      const jopCheckData = await jopCheckRes.json().catch(() => ({ data: [] }));
+      const existingJop = jopCheckData.data?.[0];
 
-      if (!jopRes.ok) {
-        const jopErr = await jopRes.json().catch(() => ({}));
-        console.error("Directus vehicle_job_order_parts error:", jopErr);
-        return json(
-          {
-            error: jopErr?.errors?.[0]?.message || "Failed to save job order part record",
-          },
-          jopRes.status || 500
-        );
+      let savedJop = null;
+
+      if (existingJop) {
+        const currentIssued = Number(existingJop.quantity_issued) || 0;
+        const currentRequested = Number(existingJop.quantity_requested) || 0;
+        const newIssued = currentIssued + qty;
+        const newRequested = Math.max(currentRequested, newIssued);
+
+        const patchJopRes = await fetch(`${DIRECTUS_URL}/items/vehicle_job_order_parts/${existingJop.id}`, {
+          method: "PATCH",
+          headers: directusHeaders(),
+          body: JSON.stringify({
+            quantity_issued: newIssued,
+            quantity_requested: newRequested,
+            unit_cost: cost || existingJop.unit_cost,
+            issued_at: dbNow,
+            remarks: itemRemarks,
+          }),
+        });
+
+        if (!patchJopRes.ok) {
+          const jopErr = await patchJopRes.json().catch(() => ({}));
+          console.error("Directus vehicle_job_order_parts patch error:", jopErr);
+          return json(
+            {
+              error: jopErr?.errors?.[0]?.message || "Failed to update job order part record",
+            },
+            patchJopRes.status || 500
+          );
+        }
+
+        const patchData = await patchJopRes.json().catch(() => ({}));
+        savedJop = patchData?.data || existingJop;
+      } else {
+        const joPartPayload: Record<string, unknown> = {
+          job_order_id: Number(job_order_id),
+          part_id: partId,
+          quantity_requested: qty,
+          quantity_issued: qty,
+          unit_cost: cost,
+          issued_at: dbNow,
+          remarks: itemRemarks,
+          created_by: currentUserId || null,
+        };
+
+        const jopRes = await fetch(`${DIRECTUS_URL}/items/vehicle_job_order_parts`, {
+          method: "POST",
+          headers: directusHeaders(),
+          body: JSON.stringify(joPartPayload),
+        });
+
+        if (!jopRes.ok) {
+          const jopErr = await jopRes.json().catch(() => ({}));
+          console.error("Directus vehicle_job_order_parts error:", jopErr);
+          return json(
+            {
+              error: jopErr?.errors?.[0]?.message || "Failed to save job order part record",
+            },
+            jopRes.status || 500
+          );
+        }
+
+        const jopData = await jopRes.json().catch(() => ({}));
+        savedJop = jopData?.data || joPartPayload;
       }
 
-      const jopData = await jopRes.json().catch(() => ({}));
-      issuedResults.push(jopData?.data || joPartPayload);
+      issuedResults.push(savedJop);
 
       // d. Optional audit: Record in vehicle_installed_parts if vehicle exists
       if (vehicleId) {
@@ -272,7 +355,7 @@ export async function POST(req: NextRequest) {
             part_id: partId,
             quantity: qty,
             job_order_id: Number(job_order_id),
-            installed_at: nowIso,
+            installed_at: dbNow,
             remarks: itemRemarks,
             created_by: currentUserId || null,
           }),

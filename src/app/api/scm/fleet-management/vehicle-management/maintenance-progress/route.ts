@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
+import { getFormattedDbNow } from "../timezone-utils";
 
 export const runtime = "nodejs";
 
@@ -147,7 +148,7 @@ export async function POST(req: NextRequest) {
     const payload = await req.json().catch(() => ({}));
     const action = payload.action;
     const userId = getUserIdFromRequest(req);
-    const utcNow = new Date().toISOString();
+    const dbNow = await getFormattedDbNow();
 
     // Helper function to process part deductions & movements
     async function deductAndIssueParts(
@@ -231,7 +232,7 @@ export async function POST(req: NextRequest) {
               quantity_issued: newIssued,
               quantity_requested: newRequested,
               issued_by: userId,
-              issued_at: utcNow,
+              issued_at: dbNow,
               unit_cost: item.unit_cost,
               remarks: item.remarks || matchingPartRow.remarks,
             }),
@@ -247,7 +248,7 @@ export async function POST(req: NextRequest) {
               quantity_issued: item.quantity,
               unit_cost: item.unit_cost,
               issued_by: userId,
-              issued_at: utcNow,
+              issued_at: dbNow,
               remarks: item.remarks || "Issued from Maintenance Progress",
             }),
           });
@@ -268,7 +269,7 @@ export async function POST(req: NextRequest) {
             reference_no: joNo,
             remarks: item.remarks || `Issued from Maintenance Progress (${joNo})`,
             created_by: userId,
-            created_at: utcNow,
+            created_at: dbNow,
           }),
         }).catch(() => null);
 
@@ -292,7 +293,7 @@ export async function POST(req: NextRequest) {
             headers: directusHeaders(),
             body: JSON.stringify({
               on_hand: newOnHand,
-              updated_at: utcNow,
+              updated_at: dbNow,
             }),
           });
         }
@@ -307,7 +308,7 @@ export async function POST(req: NextRequest) {
               part_id: partId,
               quantity: item.quantity,
               job_order_id: Number(jobOrderId),
-              installed_at: utcNow,
+              installed_at: dbNow,
               remarks: item.remarks || `Fitted during maintenance (${joNo})`,
             }),
           }).catch(() => null);
@@ -374,10 +375,10 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Update Job Order status with completed_by and strict UTC completed_at
+      // Update Job Order status with completed_by and formatted dbNow completed_at
       const completeData: Record<string, unknown> = {
         status: "Completed",
-        completed_at: utcNow,
+        completed_at: dbNow,
         completed_by: userId,
         completion_remarks: completion_remarks || "",
         labor_cost: labor_cost ? Number(labor_cost) : 0,
@@ -394,7 +395,7 @@ export async function POST(req: NextRequest) {
       if (!patchRes.ok) {
         const fallbackData = {
           status: "Completed",
-          completed_at: utcNow,
+          completed_at: dbNow,
           completion_remarks: completion_remarks || "",
           labor_cost: labor_cost ? Number(labor_cost) : 0,
         };
@@ -436,3 +437,6 @@ export async function POST(req: NextRequest) {
     return json({ error: String(err?.message || err) }, 500);
   }
 }
+
+export const PATCH = POST;
+

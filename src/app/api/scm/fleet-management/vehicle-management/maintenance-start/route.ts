@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
+import { getFormattedDbNow } from "../timezone-utils";
 
 export const runtime = "nodejs";
 
@@ -147,7 +148,7 @@ export async function PATCH(req: NextRequest) {
     const payload = await req.json();
     const { action } = payload;
     const userId = getUserIdFromRequest(req);
-    const utcNow = new Date().toISOString();
+    const dbNow = await getFormattedDbNow();
 
     // 1. Start Maintenance
     if (action === "start_maintenance") {
@@ -158,7 +159,7 @@ export async function PATCH(req: NextRequest) {
 
       const updateData: Record<string, unknown> = {
         status: "In Progress",
-        started_at: utcNow,
+        started_at: dbNow,
       };
 
       if (userId) {
@@ -277,7 +278,7 @@ export async function PATCH(req: NextRequest) {
             body: JSON.stringify({
               quantity_issued: (Number(existingJop.quantity_issued) || 0) + item.quantity,
               issued_by: userId,
-              issued_at: utcNow,
+              issued_at: dbNow,
             }),
           });
         } else {
@@ -291,7 +292,7 @@ export async function PATCH(req: NextRequest) {
               quantity_issued: item.quantity,
               unit_cost: item.unit_cost,
               issued_by: userId,
-              issued_at: utcNow,
+              issued_at: dbNow,
               remarks: item.remarks || `Issued for ${joNo}`,
             }),
           }).catch(() => null);
@@ -312,7 +313,7 @@ export async function PATCH(req: NextRequest) {
             reference_no: joNo,
             remarks: item.remarks || `Issued from Maintenance Start (${joNo})`,
             created_by: userId,
-            created_at: utcNow,
+            created_at: dbNow,
           }),
         }).catch(() => null);
 
@@ -336,7 +337,7 @@ export async function PATCH(req: NextRequest) {
             headers: directusHeaders(),
             body: JSON.stringify({
               on_hand: newOnHand,
-              updated_at: utcNow,
+              updated_at: dbNow,
             }),
           });
         }
