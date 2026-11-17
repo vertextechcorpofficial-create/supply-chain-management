@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SearchableSelect } from "./SearchableSelect";
-import { Plus, Trash2, AlertTriangle, AlertCircle, Building2, Play, PackageCheck } from "lucide-react";
+import { Plus, Trash2, AlertTriangle, AlertCircle, Building2, Play, PackageCheck, UserCheck } from "lucide-react";
 
 interface IssuePartsDialogProps {
   open: boolean;
@@ -202,6 +202,37 @@ export function IssuePartsDialog({
                 Operational Branch:
               </span>
               <span className="font-medium text-foreground">{branchName}</span>
+            </div>
+            <div className="flex justify-between items-center pt-1 border-t border-border/50 text-xs">
+              <span className="text-muted-foreground flex items-center gap-1">
+                <UserCheck className="h-3 w-3 text-muted-foreground" />
+                Assigned Mechanic:
+              </span>
+              <span>
+                {(() => {
+                  const mechanic =
+                    typeof jobOrder.mechanic_id === "object" && jobOrder.mechanic_id !== null
+                      ? jobOrder.mechanic_id
+                      : null;
+                  if (!mechanic) {
+                    return jobOrder.mechanic_id ? (
+                      <span className="font-medium text-foreground">
+                        Mechanic #{String(typeof jobOrder.mechanic_id === "object" ? (jobOrder.mechanic_id.id || jobOrder.mechanic_id.user_id) : jobOrder.mechanic_id)}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground italic">Unassigned</span>
+                    );
+                  }
+                  const first = mechanic.first_name || mechanic.user_fname || "";
+                  const last = mechanic.last_name || mechanic.user_lname || "";
+                  const full = [first, last].filter(Boolean).join(" ");
+                  return (
+                    <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                      {full || mechanic.email || mechanic.user_email || `Mechanic #${mechanic.id || mechanic.user_id}`}
+                    </span>
+                  );
+                })()}
+              </span>
             </div>
           </div>
 

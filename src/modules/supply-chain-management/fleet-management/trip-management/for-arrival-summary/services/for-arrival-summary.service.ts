@@ -16,6 +16,7 @@ export async function getEnrichedForArrivalSummary(): Promise<ForArrivalInvoice[
     customers,
     users,
     vehicles,
+    proofs,
   } = await fetchForArrivalSummaryData();
 
   if (!rawPlans.length) return [];
@@ -40,6 +41,14 @@ export async function getEnrichedForArrivalSummary(): Promise<ForArrivalInvoice[
   customers.forEach((c) => {
     if (c.customer_code) {
       customerMap.set(normalizeCode(String(c.customer_code)), c);
+    }
+  });
+
+  // Proof of delivery lookup (by post_dispatch_invoices.id as well as invoice_id for safety)
+  const proofMap = new Map<string, { outcome?: string }>();
+  proofs.forEach((p) => {
+    if (p.post_dispatch_invoice_id) {
+      proofMap.set(String(p.post_dispatch_invoice_id), { outcome: p.outcome });
     }
   });
 
@@ -116,6 +125,9 @@ export async function getEnrichedForArrivalSummary(): Promise<ForArrivalInvoice[
         }
       }
 
+      const proof = proofMap.get(String(inv.id)) || proofMap.get(String(inv.invoice_id));
+      const hasProof = !!proof;
+
       enrichedInvoices.push({
         dispatchPlanId: planIdStr,
         dispatchDocNo: String(plan.doc_no ?? ""),
@@ -139,6 +151,8 @@ export async function getEnrichedForArrivalSummary(): Promise<ForArrivalInvoice[
         dispatchStatus: String(plan.status ?? ""),
         estimatedTimeOfDispatch: String(plan.estimated_time_of_dispatch ?? ""),
         estimatedTimeOfArrival: String(plan.estimated_time_of_arrival ?? ""),
+        hasProof,
+        proofOutcome: proof?.outcome ?? null,
       });
     }
   }

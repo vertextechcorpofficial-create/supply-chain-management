@@ -201,11 +201,31 @@ export function IssuePartsModal({
       copy[index] = { ...copy[index], [field]: value };
 
       if (field === "part_id") {
-        const selectedPart = availableParts.find((p) => String(p.id) === value);
+        const selectedPart = availableParts.find((p) => String(p.id) === value) as
+          | (VehiclePart & { on_hand?: number; available?: number })
+          | undefined;
         if (selectedPart) {
           copy[index].unit_cost = String(selectedPart.unit_cost ?? 0);
+          const maxAvail = selectedPart.available ?? selectedPart.on_hand ?? 0;
+          if (maxAvail > 0 && Number(copy[index].quantity) > maxAvail) {
+            copy[index].quantity = String(maxAvail);
+          }
         }
       }
+
+      if (field === "quantity") {
+        const partId = copy[index].part_id;
+        if (partId) {
+          const selectedPart = availableParts.find((p) => String(p.id) === partId) as
+            | (VehiclePart & { on_hand?: number; available?: number })
+            | undefined;
+          const maxAvail = selectedPart?.available ?? selectedPart?.on_hand ?? 0;
+          if (maxAvail > 0 && Number(value) > maxAvail) {
+            copy[index].quantity = String(maxAvail);
+          }
+        }
+      }
+
       return copy;
     });
 
@@ -240,10 +260,31 @@ export function IssuePartsModal({
         rowErr.part_id = "Select part";
         isValid = false;
       }
-      if (!item.quantity || Number(item.quantity) <= 0 || isNaN(Number(item.quantity))) {
+      
+      const qtyNum = Number(item.quantity);
+      if (!item.quantity || qtyNum <= 0 || isNaN(qtyNum)) {
         rowErr.quantity = "Qty > 0";
         isValid = false;
+      } else if (item.part_id) {
+        const selectedPart = availableParts.find((p) => String(p.id) === item.part_id) as
+          | (VehiclePart & { on_hand?: number; available?: number })
+          | undefined;
+        const availableQty = selectedPart?.available ?? selectedPart?.on_hand ?? 0;
+        
+        // Sum total requested for this part across all rows
+        const totalRequestedForPart = items
+          .filter((it) => it.part_id === item.part_id)
+          .reduce((sum, it) => sum + (Number(it.quantity) || 0), 0);
+
+        if (availableQty <= 0) {
+          rowErr.quantity = "Out of stock";
+          isValid = false;
+        } else if (totalRequestedForPart > availableQty) {
+          rowErr.quantity = `Max: ${availableQty}`;
+          isValid = false;
+        }
       }
+
       if (item.unit_cost === "" || Number(item.unit_cost) < 0 || isNaN(Number(item.unit_cost))) {
         rowErr.unit_cost = "Cost ≥ 0";
         isValid = false;
@@ -326,8 +367,8 @@ export function IssuePartsModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!max-w-5xl sm:!max-w-5xl w-[92vw] max-h-[90vh] flex flex-col p-6">
-        <form onSubmit={handleSubmit} noValidate className="flex flex-col flex-1 min-h-0">
+      <DialogContent className="max-w-[95vw] sm:max-w-4xl max-h-[90vh] flex flex-col p-6 overflow-hidden">
+        <form onSubmit={handleSubmit} noValidate className="flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Wrench className="h-5 w-5 text-primary" />
@@ -338,9 +379,9 @@ export function IssuePartsModal({
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-4 py-4 overflow-y-auto pr-1">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1.5 relative z-50">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden min-w-0 pr-1 py-4 space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 min-w-0">
+              <div className="space-y-1.5 min-w-0 relative z-50">
                 <Label htmlFor="jo_select">
                   Select Job Order <span className="text-destructive font-bold">*</span>
                 </Label>
@@ -358,7 +399,7 @@ export function IssuePartsModal({
                 )}
               </div>
 
-              <div className="space-y-1.5 relative z-50">
+              <div className="space-y-1.5 min-w-0 relative z-50">
                 <Label htmlFor="branch_select">
                   Issuing Branch <span className="text-destructive font-bold">*</span>
                 </Label>
@@ -376,18 +417,19 @@ export function IssuePartsModal({
                 )}
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 min-w-0">
                 <Label htmlFor="remarks">Issuance Notes (Optional)</Label>
                 <Input
                   id="remarks"
                   placeholder="e.g. Issued to Mechanic Juan"
                   value={generalRemarks}
                   onChange={(e) => setGeneralRemarks(e.target.value)}
+                  className="w-full min-w-0"
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 min-w-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Label className="text-sm font-semibold">Parts to Issue</Label>
@@ -409,32 +451,50 @@ export function IssuePartsModal({
                 </Button>
               </div>
 
-              <div className="border rounded-md divide-y bg-background">
+              <div className="border rounded-md divide-y bg-background min-w-0 overflow-hidden">
                 {items.map((item, idx) => {
                   const rowErr = errors.items?.[idx];
                   const lineTotal = (Number(item.quantity) || 0) * (Number(item.unit_cost) || 0);
                   const rowZIndex = 40 - idx;
 
+                  const selectedPart = availableParts.find((p) => String(p.id) === item.part_id) as
+                    | (VehiclePart & { on_hand?: number; available?: number })
+                    | undefined;
+                  const availableQty = selectedPart?.available ?? selectedPart?.on_hand ?? null;
+
                   return (
                     <div
                       key={idx}
                       style={{ zIndex: rowZIndex }}
-                      className="p-3 bg-card/50 flex flex-col md:flex-row gap-3 items-start md:items-center relative"
+                      className="p-3 bg-card/50 flex flex-col md:flex-row gap-2.5 items-start md:items-center relative min-w-0"
                     >
-                      <div className="flex-1 w-full min-w-[280px] space-y-1 relative">
-                        <Label className="text-xs text-muted-foreground">
-                          Part <span className="text-destructive font-bold">*</span>
-                          {loadingParts && (
-                            <span className="text-[10px] text-muted-foreground ml-2 animate-pulse">
-                              (Loading branch stock...)
+                      <div className="flex-1 w-full md:min-w-[200px] space-y-1 relative min-w-0">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs text-muted-foreground">
+                            Part <span className="text-destructive font-bold">*</span>
+                            {loadingParts && (
+                              <span className="text-[10px] text-muted-foreground ml-2 animate-pulse">
+                                (Loading stock...)
+                              </span>
+                            )}
+                            {!branchId && (
+                              <span className="text-[10px] text-amber-600 ml-2">
+                                (Select branch first)
+                              </span>
+                            )}
+                          </Label>
+                          {selectedPart && availableQty !== null && (
+                            <span
+                              className={`text-[10px] font-semibold px-1.5 py-0.2 rounded ${
+                                availableQty > 0
+                                  ? "text-emerald-700 bg-emerald-100 dark:text-emerald-300 dark:bg-emerald-950/60"
+                                  : "text-rose-700 bg-rose-100 dark:text-rose-300 dark:bg-rose-950/60"
+                              }`}
+                            >
+                              Avail: {availableQty} {selectedPart.unit}
                             </span>
                           )}
-                          {!branchId && (
-                            <span className="text-[10px] text-amber-600 ml-2">
-                              (Select an issuing branch first)
-                            </span>
-                          )}
-                        </Label>
+                        </div>
                         <SearchableSelect
                           options={partOptions}
                           value={item.part_id}
@@ -458,70 +518,75 @@ export function IssuePartsModal({
                         )}
                       </div>
 
-                      <div className="w-28 space-y-1">
-                        <Label className="text-xs text-muted-foreground">
-                          Qty to Issue <span className="text-destructive font-bold">*</span>
-                        </Label>
-                        <Input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => handleItemChange(idx, "quantity", e.target.value)}
-                          className={`h-9 text-xs ${
-                            submitted && rowErr?.quantity ? "border-destructive focus-visible:ring-destructive" : ""
-                          }`}
-                        />
-                        {submitted && rowErr?.quantity && (
-                          <p className="text-[11px] text-destructive">{rowErr.quantity}</p>
-                        )}
+                      <div className="flex items-center gap-2 w-full md:w-auto min-w-0">
+                        <div className="w-24 shrink-0 space-y-1">
+                          <Label className="text-xs text-muted-foreground">
+                            Qty to Issue <span className="text-destructive font-bold">*</span>
+                          </Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            max={availableQty !== null && availableQty > 0 ? availableQty : undefined}
+                            value={item.quantity}
+                            onChange={(e) => handleItemChange(idx, "quantity", e.target.value)}
+                            className={`h-9 text-xs ${
+                              submitted && rowErr?.quantity ? "border-destructive focus-visible:ring-destructive" : ""
+                            }`}
+                          />
+                          {submitted && rowErr?.quantity && (
+                            <p className="text-[11px] text-destructive">{rowErr.quantity}</p>
+                          )}
+                        </div>
+
+                        <div className="w-28 shrink-0 space-y-1">
+                          <Label className="text-xs text-muted-foreground">
+                            Unit Cost (₱) <span className="text-destructive font-bold">*</span>
+                          </Label>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={item.unit_cost}
+                            onChange={(e) => handleItemChange(idx, "unit_cost", e.target.value)}
+                            className={`h-9 text-xs ${
+                              submitted && rowErr?.unit_cost ? "border-destructive focus-visible:ring-destructive" : ""
+                            }`}
+                          />
+                          {submitted && rowErr?.unit_cost && (
+                            <p className="text-[11px] text-destructive">{rowErr.unit_cost}</p>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="w-36 space-y-1">
-                        <Label className="text-xs text-muted-foreground">
-                          Unit Cost (₱) <span className="text-destructive font-bold">*</span>
-                        </Label>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={item.unit_cost}
-                          onChange={(e) => handleItemChange(idx, "unit_cost", e.target.value)}
-                          className={`h-9 text-xs ${
-                            submitted && rowErr?.unit_cost ? "border-destructive focus-visible:ring-destructive" : ""
-                          }`}
-                        />
-                        {submitted && rowErr?.unit_cost && (
-                          <p className="text-[11px] text-destructive">{rowErr.unit_cost}</p>
-                        )}
-                      </div>
-
-                      <div className="flex-1 w-full min-w-[180px] space-y-1">
+                      <div className="w-full md:flex-1 md:min-w-[140px] space-y-1 min-w-0">
                         <Label className="text-xs text-muted-foreground">Part Notes</Label>
                         <Input
                           placeholder="Specific installation notes"
                           value={item.remarks}
                           onChange={(e) => handleItemChange(idx, "remarks", e.target.value)}
-                          className="h-9 text-xs"
+                          className="h-9 text-xs w-full min-w-0"
                         />
                       </div>
 
-                      <div className="w-32 text-right self-center pt-3 md:pt-0">
-                        <div className="text-[10px] text-muted-foreground">Total Cost</div>
-                        <div className="font-semibold text-sm">
-                          ₱{lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      <div className="flex items-center justify-between md:justify-end gap-3 w-full md:w-auto shrink-0 pt-2 md:pt-0 border-t md:border-t-0">
+                        <div className="text-left md:text-right">
+                          <div className="text-[10px] text-muted-foreground">Total Cost</div>
+                          <div className="font-semibold text-xs sm:text-sm">
+                            ₱{lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
                         </div>
-                      </div>
 
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:bg-destructive/10 self-center pt-2 md:pt-0"
-                        onClick={() => handleRemoveItem(idx)}
-                        disabled={items.length <= 1}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:bg-destructive/10 shrink-0"
+                          onClick={() => handleRemoveItem(idx)}
+                          disabled={items.length <= 1}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   );
                 })}

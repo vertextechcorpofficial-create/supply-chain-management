@@ -6,6 +6,7 @@ import {
   CustomerRow,
   UserRow,
   VehicleRow,
+  PostDispatchDeliveryProofRow,
 } from "../types/for-arrival-summary.types";
 
 const DIRECTUS_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || "").replace(
@@ -51,6 +52,7 @@ export async function fetchForArrivalSummaryData() {
     customersRes,
     usersRes,
     vehiclesRes,
+    proofsRes,
   ] = await Promise.all([
     fetchDirectus<PostDispatchPlanRow[]>(
       `/items/post_dispatch_plan?limit=-1&fields=id,doc_no,driver_id,vehicle_id,status,estimated_time_of_dispatch,estimated_time_of_arrival,time_of_dispatch,remarks&filter[status][_eq]=For Inbound&sort=estimated_time_of_dispatch`,
@@ -73,9 +75,12 @@ export async function fetchForArrivalSummaryData() {
     fetchDirectus<VehicleRow[]>(
       `/items/vehicles?limit=-1&fields=vehicle_id,vehicle_plate`,
     ),
+    fetchDirectus<PostDispatchDeliveryProofRow[]>(
+      `/items/post_dispatch_delivery_proofs?limit=-1&fields=id,post_dispatch_plan_id,post_dispatch_invoice_id,outcome`,
+    ),
   ]);
 
-  const allResults = [plansRes, staffRes, invRes, salesInvRes, customersRes, usersRes, vehiclesRes];
+  const allResults = [plansRes, staffRes, invRes, salesInvRes, customersRes, usersRes, vehiclesRes, proofsRes];
   const failed = allResults.find((x) => !x.ok);
   if (failed && !failed.ok) {
     throw new Error(
@@ -91,6 +96,7 @@ export async function fetchForArrivalSummaryData() {
     customers: (customersRes as { ok: true; json: { data: CustomerRow[] } }).json?.data ?? [],
     users: (usersRes as { ok: true; json: { data: UserRow[] } }).json?.data ?? [],
     vehicles: (vehiclesRes as { ok: true; json: { data: VehicleRow[] } }).json?.data ?? [],
+    proofs: (proofsRes as { ok: true; json: { data: PostDispatchDeliveryProofRow[] } }).json?.data ?? [],
   };
 }
 

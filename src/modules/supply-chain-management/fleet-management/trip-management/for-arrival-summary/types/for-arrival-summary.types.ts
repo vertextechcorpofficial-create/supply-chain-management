@@ -62,6 +62,11 @@ export interface ForArrivalInvoice {
   estimatedTimeOfDispatch: string;
   /** post_dispatch_plan.estimated_time_of_arrival */
   estimatedTimeOfArrival: string;
+
+  /** Whether delivery proof exists in post_dispatch_delivery_proofs */
+  hasProof?: boolean;
+  /** Delivery proof outcome if exists */
+  proofOutcome?: string | null;
 }
 
 /** API response wrapper */
@@ -164,4 +169,11 @@ export interface UserRow {
 export interface VehicleRow {
   vehicle_id: number;
   vehicle_plate: string;
+}
+
+export interface PostDispatchDeliveryProofRow {
+  id: number;
+  post_dispatch_plan_id: number;
+  post_dispatch_invoice_id: number;
+  outcome?: string;
 }

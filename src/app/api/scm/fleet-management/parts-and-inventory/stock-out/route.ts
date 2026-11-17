@@ -6,6 +6,44 @@ export const runtime = "nodejs";
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const DIRECTUS_TOKEN = process.env.DIRECTUS_STATIC_TOKEN || "";
 
+let cachedTimezone: string | null = null;
+
+async function fetchDatabaseTimezone(): Promise<string> {
+  if (cachedTimezone) return cachedTimezone;
+  try {
+    const res = await fetch(`${DIRECTUS_URL}/items/general_setting?filter[setting_key][_eq]=time_zone&limit=1`, {
+      headers: directusHeaders(),
+      cache: "no-store",
+    });
+    if (res.ok) {
+      const json = await res.json().catch(() => ({}));
+      const setting = json?.data?.[0];
+      const val = setting?.setting_value;
+      if (typeof val === "string" && val.trim().length > 0) {
+        const tz = val.trim();
+        cachedTimezone = tz;
+        return tz;
+      }
+    }
+  } catch {
+    // fallback
+  }
+  return "Asia/Manila";
+}
+
+async function getFormattedDbNow(): Promise<string> {
+  const tz = await fetchDatabaseTimezone();
+  return new Date().toLocaleString("sv-SE", {
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  }).replace(" ", "T");
+}
+
 function json(res: unknown, status = 200) {
   return NextResponse.json(res, { status });
 }
@@ -115,7 +153,7 @@ export async function POST(req: NextRequest) {
 
     const assignedRefNo = reference_no && reference_no.trim() ? reference_no.trim() : `SO-${Date.now().toString().slice(-6)}`;
     const userId = getUserIdFromRequest(req);
-    const nowIso = new Date().toISOString();
+    const dbNow = await getFormattedDbNow();
     const movType = movement_type || "Disposal";
 
     // 1. Pre-validate stock for all items before any mutation
@@ -162,7 +200,7 @@ export async function POST(req: NextRequest) {
         reference_no: assignedRefNo,
         remarks: item.remarks || remarks || "",
         created_by: userId || null,
-        created_at: nowIso,
+        created_at: dbNow,
       };
 
       const movRes = await fetch(`${DIRECTUS_URL}/items/vehicle_part_movements`, {

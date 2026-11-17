@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { SearchableSelect } from "./SearchableSelect";
-import { CheckCircle2, XCircle, Wrench } from "lucide-react";
+import { CheckCircle2, XCircle, Wrench, Package } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ApproveAssignDialogProps {
@@ -114,6 +114,42 @@ export function ApproveAssignDialog({
                 <p className="text-foreground italic break-words [overflow-wrap:anywhere] [word-break:break-word]">
                   {jobOrder.description}
                 </p>
+              </div>
+            )}
+
+            {/* Requested Parts */}
+            {jobOrder.parts && jobOrder.parts.length > 0 && (
+              <div className="pt-1.5 border-t text-xs space-y-1.5">
+                <span className="text-muted-foreground font-medium flex items-center gap-1 text-[11px]">
+                  <Package className="h-3.5 w-3.5 text-primary shrink-0" />
+                  Requested Parts ({jobOrder.parts.length}):
+                </span>
+                <div className="bg-background/80 rounded border divide-y text-xs">
+                  {jobOrder.parts.map((p, idx) => (
+                    <div key={idx} className="p-2 flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="font-medium text-foreground truncate block text-xs">
+                          {p.part_name || p.part_code || `Part #${p.part_id}`}
+                        </span>
+                        {p.part_code && (
+                          <span className="text-muted-foreground font-mono text-[10px]">
+                            {p.part_code}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0 text-xs">
+                        <span>
+                          Qty: <strong className="font-semibold">{p.quantity_requested}</strong>
+                        </span>
+                        {Number(p.unit_cost) > 0 && (
+                          <span className="text-muted-foreground font-mono text-[11px]">
+                            ₱{Number(p.unit_cost).toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>

@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { MapPin, ChevronDown, ChevronUp } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
   Accordion,
   AccordionContent,
@@ -46,8 +47,19 @@ export function InvoiceCard({ group }: InvoiceCardProps) {
   const invoiceCount = group.invoices.length;
   const isSingleInvoice = invoiceCount === 1;
 
+  // Check if every invoice in this customer group has a delivery proof
+  const allInvoicesDelivered =
+    group.invoices.length > 0 && group.invoices.every((inv) => Boolean(inv.hasProof));
+
   return (
-    <Card className="gap-0 rounded-md border border-border py-0">
+    <Card
+      className={cn(
+        "gap-0 rounded-md border py-0 transition-colors",
+        allInvoicesDelivered
+          ? "border-emerald-600 bg-emerald-100/80 shadow-sm dark:border-emerald-500 dark:bg-emerald-950/50"
+          : "border-border bg-card",
+      )}
+    >
       <Accordion type="single" collapsible className="w-full">
         <AccordionItem value="item-1" className="border-b-0">
           {/* Main Details (Always Visible) */}
@@ -178,29 +190,46 @@ export function InvoiceCard({ group }: InvoiceCardProps) {
 
                   {isExpanded && (
                     <div className="mt-2 space-y-1.5 bg-muted/30 rounded-md p-2">
-                      {group.invoices.map((invoice) => (
-                        <div
-                          key={`${invoice.invoiceId}-${invoice.sequence}`}
-                          className="flex items-center justify-between text-[11px] py-1 px-1.5 rounded hover:bg-muted/50"
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="font-medium text-foreground truncate">
-                              {invoice.invoiceNo || invoice.invoiceId}
-                            </span>
+                      {group.invoices.map((invoice) => {
+                        const hasProof = Boolean(invoice.hasProof);
+                        return (
+                          <div
+                            key={`${invoice.invoiceId}-${invoice.sequence}`}
+                            className={cn(
+                              "flex items-center justify-between text-[11px] py-1 px-1.5 rounded transition-colors",
+                              hasProof
+                                ? "bg-emerald-200/90 text-emerald-950 border border-emerald-500 font-medium dark:bg-emerald-900/60 dark:text-emerald-50 dark:border-emerald-600"
+                                : "hover:bg-muted/50",
+                            )}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className={cn(
+                                "truncate",
+                                hasProof ? "text-emerald-950 dark:text-emerald-50 font-semibold" : "text-foreground font-medium"
+                              )}>
+                                {invoice.invoiceNo || invoice.invoiceId}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className={cn(
+                                "text-[10px]",
+                                hasProof ? "text-emerald-900 font-medium dark:text-emerald-200" : "text-muted-foreground"
+                              )}>
+                                {formatCurrency(invoice.totalAmount)}
+                              </span>
+                              <Badge
+                                variant={hasProof ? "default" : getInvoiceStatusVariant(invoice.invoiceStatus)}
+                                className={cn(
+                                  "text-[9px] h-4 px-1.5",
+                                  hasProof && "bg-emerald-700 text-white hover:bg-emerald-700 border-transparent dark:bg-emerald-600"
+                                )}
+                              >
+                                {invoice.proofOutcome || invoice.invoiceStatus || "N/A"}
+                              </Badge>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-muted-foreground text-[10px]">
-                              {formatCurrency(invoice.totalAmount)}
-                            </span>
-                            <Badge
-                              variant={getInvoiceStatusVariant(invoice.invoiceStatus)}
-                              className="text-[9px] h-4 px-1.5"
-                            >
-                              {invoice.invoiceStatus || "N/A"}
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -209,17 +238,40 @@ export function InvoiceCard({ group }: InvoiceCardProps) {
 
             {/* Single invoice — show invoice no and status inline */}
             {isSingleInvoice && (
-              <div className="flex items-center justify-between">
+              <div
+                className={cn(
+                  "flex items-center justify-between rounded p-1.5 transition-colors",
+                  Boolean(firstInvoice.hasProof) &&
+                    "bg-emerald-200/90 border border-emerald-500 dark:bg-emerald-900/60 dark:border-emerald-600"
+                )}
+              >
                 <div className="space-y-0.5">
                   <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                     Invoice No
                   </p>
-                  <p className="text-xs text-foreground">
+                  <p
+                    className={cn(
+                      "text-xs font-medium",
+                      Boolean(firstInvoice.hasProof)
+                        ? "text-emerald-950 dark:text-emerald-50 font-semibold"
+                        : "text-foreground"
+                    )}
+                  >
                     {firstInvoice.invoiceNo || firstInvoice.invoiceId}
                   </p>
                 </div>
-                <Badge variant={getInvoiceStatusVariant(firstInvoice.invoiceStatus)}>
-                  {firstInvoice.invoiceStatus || "N/A"}
+                <Badge
+                  variant={
+                    Boolean(firstInvoice.hasProof)
+                      ? "default"
+                      : getInvoiceStatusVariant(firstInvoice.invoiceStatus)
+                  }
+                  className={cn(
+                    Boolean(firstInvoice.hasProof) &&
+                      "bg-emerald-700 text-white hover:bg-emerald-700 border-transparent dark:bg-emerald-600 font-semibold"
+                  )}
+                >
+                  {firstInvoice.proofOutcome || firstInvoice.invoiceStatus || "N/A"}
                 </Badge>
               </div>
             )}

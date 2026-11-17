@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { decodeJwtPayload, COOKIE_NAME } from "@/lib/auth-utils";
+import { getFormattedDbNow } from "../timezone-utils";
 
 export const runtime = "nodejs";
 
@@ -151,8 +152,8 @@ export async function PATCH(req: NextRequest) {
         return json({ error: "Missing required approval payload" }, 400);
       }
 
-      // Enforce strict UTC timestamp
-      const utcNow = new Date().toISOString();
+      // Enforce database timezone timestamp
+      const dbNow = await getFormattedDbNow();
 
       let updateData: Record<string, unknown> = {};
 
@@ -160,7 +161,7 @@ export async function PATCH(req: NextRequest) {
         updateData = {
           status: "Approved",
           approved_by: userId,
-          approved_at: utcNow,
+          approved_at: dbNow,
           decision_remarks: decision_remarks || null,
         };
         if (mechanic_id) {
@@ -171,7 +172,7 @@ export async function PATCH(req: NextRequest) {
         updateData = {
           status: "Rejected",
           rejected_by: userId,
-          rejected_at: utcNow,
+          rejected_at: dbNow,
           approved_by: null,
           approved_at: null,
           decision_remarks: decision_remarks || null,
