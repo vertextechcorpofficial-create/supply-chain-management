@@ -18,9 +18,11 @@ async function fetchDatabaseTimezone(): Promise<string> {
     if (res.ok) {
       const json = await res.json().catch(() => ({}));
       const setting = json?.data?.[0];
-      if (typeof setting?.setting_value === "string" && setting.setting_value.trim()) {
-        cachedTimezone = setting.setting_value.trim();
-        return cachedTimezone;
+      const val = setting?.setting_value;
+      if (typeof val === "string" && val.trim().length > 0) {
+        const tz = val.trim();
+        cachedTimezone = tz;
+        return tz;
       }
     }
   } catch {
