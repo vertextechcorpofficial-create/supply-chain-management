@@ -1,5 +1,3 @@
-import { NextRequest } from "next/server";
-
 const DIRECTUS_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 const DIRECTUS_TOKEN = process.env.DIRECTUS_STATIC_TOKEN || "";
 
