@@ -295,9 +295,9 @@ export async function GET(req: NextRequest) {
 
       // Trigger condition: Available stock is at or below the reorder point
       if (available <= reorderPoint) {
-        const targetStock = Math.max(reorderPoint * 2, 10);
-        const suggestedQty = Math.max(1, targetStock - available);
-        const deficit = Math.max(0, reorderPoint - available);
+        // Requested formula: Reorder Point - On-Hand = Suggested Order
+        const deficit = Math.max(0, reorderPoint - onHand);
+        const suggestedQty = Math.max(1, deficit);
 
         const classObj = typeof p.classification_id === "object" && p.classification_id !== null ? (p.classification_id as Record<string, unknown>) : null;
 
@@ -344,8 +344,9 @@ export async function GET(req: NextRequest) {
         });
 
         if (!hasStock) {
-          const targetStock = Math.max(reorderPoint * 2, 10);
           const classObj = typeof p.classification_id === "object" && p.classification_id !== null ? (p.classification_id as Record<string, unknown>) : null;
+          const deficit = reorderPoint;
+          const suggestedQty = Math.max(1, reorderPoint);
 
           triggers.push({
             id: `cat-${partId}-${targetBranchId}`,
@@ -362,8 +363,8 @@ export async function GET(req: NextRequest) {
             reserved: 0,
             available: 0,
             reorder_point: reorderPoint,
-            deficit: reorderPoint,
-            suggested_quantity: targetStock,
+            deficit,
+            suggested_quantity: suggestedQty,
             active_pr_id: activePrInfo?.id || null,
             active_pr_no: activePrInfo?.pr_no || null,
             active_pr_status: activePrInfo?.status || null,
