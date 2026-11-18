@@ -54,7 +54,7 @@ async function resolveParentMasterId(
     }
   }
 
-  let parentCode = (draft.parent_id as unknown as { product_code?: string } | undefined)?.product_code;
+  let parentCode: string | null | undefined = (draft.parent_id as unknown as { product_code?: string | null } | undefined)?.product_code;
 
   if (!parentCode) {
     try {
