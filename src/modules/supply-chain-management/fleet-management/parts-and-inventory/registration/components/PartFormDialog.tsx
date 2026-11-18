@@ -87,8 +87,34 @@ export function PartFormDialog({
       if (part) {
         setPartCode(part.part_code || "");
         setPartName(part.part_name || "");
-        setClassificationId(part.classification_id ? String(part.classification_id) : "");
-        setSupplierId(part.supplier_id ? String(part.supplier_id) : part.supplier?.id ? String(part.supplier.id) : "");
+
+        // Safely extract classification ID whether it's an expanded object, number, or category fallback
+        let resolvedClassId = "";
+        if (typeof part.classification_id === "object" && part.classification_id !== null) {
+          resolvedClassId = String((part.classification_id as { id?: number }).id || "");
+        } else if (typeof part.classification_id === "number" || typeof part.classification_id === "string") {
+          resolvedClassId = String(part.classification_id);
+        } else if (part.classification?.id) {
+          resolvedClassId = String(part.classification.id);
+        } else if (part.category) {
+          const match = classifications.find(
+            (c) => c.name.toLowerCase().trim() === part.category?.toLowerCase().trim()
+          );
+          if (match) resolvedClassId = String(match.id);
+        }
+        setClassificationId(resolvedClassId);
+
+        // Safely extract supplier ID whether it's an object or number
+        let resolvedSupplierId = "";
+        if (typeof part.supplier_id === "object" && part.supplier_id !== null) {
+          resolvedSupplierId = String((part.supplier_id as { id?: number }).id || "");
+        } else if (part.supplier_id) {
+          resolvedSupplierId = String(part.supplier_id);
+        } else if (part.supplier?.id) {
+          resolvedSupplierId = String(part.supplier.id);
+        }
+        setSupplierId(resolvedSupplierId);
+
         if (part.barcode) {
           setUseCustomBarcode(true);
           setCustomBarcode(part.barcode);
@@ -115,7 +141,7 @@ export function PartFormDialog({
         setIsActive(true);
       }
     }
-  }, [part, open]);
+  }, [part, open, classifications]);
 
   const handleGenerateBarcode = () => {
     setUseCustomBarcode(true);
@@ -191,16 +217,16 @@ export function PartFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <form onSubmit={handleSubmit} noValidate>
-          <DialogHeader>
+      <DialogContent className="max-w-lg w-[95vw] max-h-[88vh] flex flex-col p-6 overflow-hidden">
+        <form onSubmit={handleSubmit} noValidate className="flex flex-col flex-1 min-h-0">
+          <DialogHeader className="shrink-0 pb-1">
             <DialogTitle>{isEditing ? "Edit Vehicle Part" : "Register New Part"}</DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-xs">
               Enter part catalog details, select classification, and configure barcode inheritance.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid gap-3.5 py-3">
+          <div className="flex-1 overflow-y-auto pr-1 py-2 space-y-3.5">
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label htmlFor="part_code">
@@ -492,7 +518,7 @@ export function PartFormDialog({
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="shrink-0 pt-3 border-t mt-2">
             <Button
               type="button"
               variant="outline"
