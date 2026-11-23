@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sopPath, sopQuery } from '@/modules/supply-chain-management/sop-safety/server/routes';
-import { authorizeSop, SopAccessError } from '@/modules/supply-chain-management/sop-safety/server/access';
+import { authorizeSop, SopAccessError, isSameOriginRequest } from '@/modules/supply-chain-management/sop-safety/server/access';
 import { validateSopWrite } from '@/modules/supply-chain-management/sop-safety/schemas/write.schema';
 import { sopOperationCapability } from '@/modules/supply-chain-management/sop-safety/permissions';
 import { pageSchema, actionSchema } from '@/modules/supply-chain-management/sop-safety/schemas/response.schema';
@@ -21,7 +21,7 @@ async function handle(req: NextRequest, context: { params: Promise<{ path: strin
     try {
         query = sopQuery(resource, new URLSearchParams(req.nextUrl.search));
         if (writing) {
-            if (req.headers.get('origin') !== req.nextUrl.origin) return error('Cross-origin SOP writes are not allowed.', 403);
+            if (!isSameOriginRequest(req)) return error('Cross-origin SOP writes are not allowed.', 403);
             if (req.nextUrl.search) return error('Write requests do not accept query parameters.', 400);
             if (req.method !== 'DELETE' && req.headers.get('content-type')?.split(';')[0].trim().toLowerCase() !== 'application/json') return error('Send JSON.', 415);
             const text = req.method === 'DELETE' ? '' : await req.text();

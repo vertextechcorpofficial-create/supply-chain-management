@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { authorizeSop, SopAccessError } from '@/modules/supply-chain-management/sop-safety/server/access';
+import { authorizeSop, SopAccessError, isSameOriginRequest } from '@/modules/supply-chain-management/sop-safety/server/access';
 import { auditDetailSchema, attachmentSchema, actionSchema } from '@/modules/supply-chain-management/sop-safety/schemas/response.schema';
 import { attachmentWriteSchema } from '@/modules/supply-chain-management/sop-safety/schemas/write.schema';
 // Pure image decoding/metadata stripping is shared infrastructure, not 5S policy.
@@ -31,7 +31,7 @@ async function handle(req: NextRequest, context: { params: Promise<{ auditId: st
     const uploading = req.method === 'POST';
     if (!/^[1-9]\d*$/.test(auditId) || (uploading ? fileId !== 'upload' : !/^[1-9]\d*$/.test(fileId))) return error('Invalid file resource.', 404);
     if (req.nextUrl.search) return error('File requests do not accept query parameters.', 400);
-    if (uploading && req.headers.get('origin') !== req.nextUrl.origin) return error('Cross-origin upload denied.', 403);
+    if (uploading && !isSameOriginRequest(req)) return error('Cross-origin upload denied.', 403);
     let uploadedId: string | undefined;
     try {
         const { fetchSop, requireCapability } = await authorizeSop(req);

@@ -7,6 +7,7 @@ import { springKpiSchema } from '../../spring/contracts';
 import { auditDetail, attachmentRow, parseContract } from '../../spring/workflow';
 import { checkerActionSchema, checkerActionPage, checkerAuditPage, overdue } from '../contracts';
 import { manilaToday } from '../../shared/contracts';
+import { isSameOriginRequest } from '../../server/security';
 
 const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
 const id = z.coerce.number().int().positive().safe();
@@ -28,7 +29,7 @@ export async function handleCheckerRequest(req: NextRequest, segments: string[])
             if (!/^actions\/[1-9]\d*\/done$/.test(resource)) throw new CheckerAccessError(403, 'This Checker operation is read-only.');
             const actionId = id.parse(segments[1]);
             if (!access.canComplete) throw new CheckerAccessError(403, 'Checker resolution permission is required.');
-            if (req.headers.get('origin') !== req.nextUrl.origin) throw new CheckerAccessError(403, 'Status updates must originate from this application.');
+            if (!isSameOriginRequest(req)) throw new CheckerAccessError(403, 'Status updates must originate from this application.');
             if (req.nextUrl.search || !req.headers.get('content-type')?.includes('application/json')) throw new CheckerAccessError(400, 'Send a JSON status confirmation without query parameters.');
             const text = await req.text(); if (text.length > 2000) throw new CheckerAccessError(413, 'Request too large.');
             const body = z.object({ auditId: id, branchId: id }).strict().parse(JSON.parse(text));

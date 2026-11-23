@@ -4,6 +4,7 @@ import { COOKIE_NAME } from '@/lib/auth-utils';
 import { normalizePhoto } from '@/modules/supply-chain-management/housekeeping/server/image-processing';
 import { attachmentRow, auditRow } from '@/modules/supply-chain-management/housekeeping/spring/workflow';
 import { authorizeHousekeeping, authorizeChecker, checkerError } from '@/modules/supply-chain-management/housekeeping/checker/server/access';
+import { isSameOriginRequest } from '@/modules/supply-chain-management/housekeeping/server/security';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const noStore = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
@@ -23,7 +24,7 @@ async function handle(req: NextRequest, context: { params: Promise<{ auditId: st
     if (!token) return failure('Sign in to access Housekeeping photos.', 401);
     const { auditId, fileId } = await context.params;
     if (!/^[1-9]\d*$/.test(auditId) || (req.method === 'GET' ? !/^[1-9]\d*$/.test(fileId) : fileId !== 'upload')) return failure('Invalid resource.', 404);
-    if (req.method === 'POST' && req.headers.get('origin') !== req.nextUrl.origin) return failure('Cross-origin upload denied.', 403);
+    if (req.method === 'POST' && !isSameOriginRequest(req)) return failure('Cross-origin upload denied.', 403);
     const spring = process.env.SPRING_API_BASE_URL, directus = process.env.NEXT_PUBLIC_API_BASE_URL, fileToken = process.env.DIRECTUS_STATIC_TOKEN;
     if (!spring || !directus || !fileToken) return failure('File services are not configured.', 503);
     const options = { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' as const, redirect: 'manual' as const, signal: AbortSignal.timeout(20000) };

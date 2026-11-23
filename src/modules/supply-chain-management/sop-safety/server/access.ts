@@ -1,8 +1,34 @@
 import { COOKIE_NAME, decodeJwtPayload } from '@/lib/auth-utils';
 import { rolesFromSopGrants, sopCapabilities, sopRoles, type SopRole, type SopCapability } from '../permissions';
+import type { NextRequest } from 'next/server';
 
 export class SopAccessError extends Error {
     constructor(readonly status: number, message: string) { super(message); }
+}
+
+export function isSameOriginRequest(req: NextRequest): boolean {
+    const origin = req.headers.get('origin');
+    if (!origin) return false;
+
+    try {
+        const submitted = new URL(origin);
+        if (origin !== submitted.origin || !['http:', 'https:'].includes(submitted.protocol)) return false;
+
+        const host = req.headers.get('host')?.toLowerCase();
+        const forwardedHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim().toLowerCase();
+        const forwardedProto = req.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+        const expectedProtocol = forwardedProto
+            ? `${forwardedProto.replace(/:$/, '')}:`
+            : req.nextUrl.protocol;
+
+        if (submitted.protocol !== expectedProtocol.toLowerCase()) return false;
+        if (forwardedHost && host?.startsWith(`${forwardedHost}:`) && /^\d+$/.test(host.slice(forwardedHost.length + 1))) {
+            return submitted.host === host;
+        }
+        return submitted.host === (forwardedHost || host || req.nextUrl.host.toLowerCase());
+    } catch {
+        return false;
+    }
 }
 
 export async function authorizeSop(req: { cookies: { get(name: string): { value: string } | undefined } }) {
