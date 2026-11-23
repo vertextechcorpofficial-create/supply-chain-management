@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sopPath, sopQuery } from '@/modules/supply-chain-management/sop-safety/server/routes';
-import { authorizeSop, SopAccessError } from '@/modules/supply-chain-management/sop-safety/server/access';
+import { authorizeSop, SopAccessError, isSameOriginRequest } from '@/modules/supply-chain-management/sop-safety/server/access';
 import { validateSopWrite } from '@/modules/supply-chain-management/sop-safety/schemas/write.schema';
 import { sopOperationCapability } from '@/modules/supply-chain-management/sop-safety/permissions';
 import { pageSchema, actionSchema } from '@/modules/supply-chain-management/sop-safety/schemas/response.schema';
-import { isSameOriginRequest } from '@/lib/request-security';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

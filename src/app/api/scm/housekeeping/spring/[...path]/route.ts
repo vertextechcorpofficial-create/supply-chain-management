@@ -4,7 +4,7 @@ import { springHousekeepingPath, springHousekeepingQuery } from '@/modules/suppl
 import { validateSpringWrite } from '@/modules/supply-chain-management/housekeeping/spring/write-contracts';
 import { authorizeHousekeeping, checkerError } from '@/modules/supply-chain-management/housekeeping/checker/server/access';
 import { handleCheckerRequest } from '@/modules/supply-chain-management/housekeeping/checker/server/handler';
-import { isSameOriginRequest } from '@/lib/request-security';
+import { isSameOriginRequest } from '@/modules/supply-chain-management/housekeeping/server/security';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

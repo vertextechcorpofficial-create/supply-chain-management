@@ -4,7 +4,7 @@ import { COOKIE_NAME } from '@/lib/auth-utils';
 import { normalizePhoto } from '@/modules/supply-chain-management/housekeeping/server/image-processing';
 import { attachmentRow, auditRow } from '@/modules/supply-chain-management/housekeeping/spring/workflow';
 import { authorizeHousekeeping, authorizeChecker, checkerError } from '@/modules/supply-chain-management/housekeeping/checker/server/access';
-import { isSameOriginRequest } from '@/lib/request-security';
+import { isSameOriginRequest } from '@/modules/supply-chain-management/housekeeping/server/security';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const noStore = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };

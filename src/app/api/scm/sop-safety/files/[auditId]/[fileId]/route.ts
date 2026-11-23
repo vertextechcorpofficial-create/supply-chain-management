@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { authorizeSop, SopAccessError } from '@/modules/supply-chain-management/sop-safety/server/access';
+import { authorizeSop, SopAccessError, isSameOriginRequest } from '@/modules/supply-chain-management/sop-safety/server/access';
 import { auditDetailSchema, attachmentSchema, actionSchema } from '@/modules/supply-chain-management/sop-safety/schemas/response.schema';
 import { attachmentWriteSchema } from '@/modules/supply-chain-management/sop-safety/schemas/write.schema';
 // Pure image decoding/metadata stripping is shared infrastructure, not 5S policy.
 import { normalizePhoto } from '@/modules/supply-chain-management/housekeeping/server/image-processing';
-import { isSameOriginRequest } from '@/lib/request-security';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

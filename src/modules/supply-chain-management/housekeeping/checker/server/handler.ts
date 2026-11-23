@@ -7,7 +7,7 @@ import { springKpiSchema } from '../../spring/contracts';
 import { auditDetail, attachmentRow, parseContract } from '../../spring/workflow';
 import { checkerActionSchema, checkerActionPage, checkerAuditPage, overdue } from '../contracts';
 import { manilaToday } from '../../shared/contracts';
-import { isSameOriginRequest } from '@/lib/request-security';
+import { isSameOriginRequest } from '../../server/security';
 
 const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' };
 const id = z.coerce.number().int().positive().safe();
