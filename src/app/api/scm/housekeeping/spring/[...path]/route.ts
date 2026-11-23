@@ -4,6 +4,7 @@ import { springHousekeepingPath, springHousekeepingQuery } from '@/modules/suppl
 import { validateSpringWrite } from '@/modules/supply-chain-management/housekeeping/spring/write-contracts';
 import { authorizeHousekeeping, checkerError } from '@/modules/supply-chain-management/housekeeping/checker/server/access';
 import { handleCheckerRequest } from '@/modules/supply-chain-management/housekeeping/checker/server/handler';
+import { isSameOriginRequest } from '@/lib/request-security';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,7 +33,7 @@ async function handle(req: NextRequest, context: { params: Promise<{ path: strin
     let payload: unknown;
     if (method !== 'GET') {
         // Cookie-authenticated mutations must originate from this app, not a third-party page.
-        if (req.headers.get('origin') !== req.nextUrl.origin) return error('Cross-origin Housekeeping writes are not allowed.', 403);
+        if (!isSameOriginRequest(req)) return error('Cross-origin Housekeeping writes are not allowed.', 403);
         if (req.nextUrl.search) return error('Write requests do not accept query parameters.', 400);
         if (method !== 'DELETE' && !req.headers.get('content-type')?.includes('application/json')) return error('Send JSON.', 415);
         try {
