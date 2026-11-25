@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -23,7 +22,7 @@ export default function HousekeepingCheckerModule() {
     const [accessRevision, setAccessRevision] = useState(0);
     const [revision, setRevision] = useState(0);
     const access = useCheckerAccess(accessRevision);
-    const [requestedBranch, setRequestedBranch] = useState('');
+    const [requestedBranch] = useState('');
     const [month, setMonth] = useState(() => manilaToday().slice(0, 7));
     const [tab, setTab] = useState('overview');
     const [auditPage, setAuditPage] = useState(1);
@@ -57,7 +56,7 @@ export default function HousekeepingCheckerModule() {
     return <div className="space-y-5"><div className="flex flex-wrap items-start justify-between gap-3"><div className="flex items-center gap-3"><div className="rounded-xl bg-primary/10 p-3 text-primary"><Eye className="size-6" /></div><div><h1 className="text-2xl font-semibold tracking-tight">Housekeeping Checker</h1><p className="text-sm text-muted-foreground">Monitor warehouse inspection results and corrective actions.</p></div></div><Button variant="outline" disabled={loading} onClick={() => { clearSelection(); setAccessRevision(v => v + 1); setRevision(v => v + 1); }}><RefreshCw className="mr-2 size-4" />Refresh</Button></div>
         {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
         {!access.loading && access.data && !warehouses.length && <Alert><AlertDescription>No approved active warehouses are available for this workspace.</AlertDescription></Alert>}
-        <Card><CardContent className="grid gap-3 pt-5 sm:grid-cols-2"><div role="group" aria-label="Warehouse selector" className="space-y-1"><p className="text-sm font-medium">Warehouse</p><SearchableSelect value={branchId} disabled={access.loading || !warehouses.length} placeholder="Select warehouse" options={warehouses.map(w => ({ value: String(w.id), label: `${w.name}${w.code ? ` · ${w.code}` : ''}` }))} onValueChange={value => { setRequestedBranch(value); clearSelection(); }} /><p className="text-xs text-muted-foreground">Warehouse selection is a reporting filter, not proof of ownership or write permission.</p></div><div className="space-y-1"><Label htmlFor="checker-month">Reporting month</Label><Input id="checker-month" type="month" value={month} disabled={access.loading} onChange={e => { setMonth(e.target.value); clearSelection(); }} /><p className="text-xs text-muted-foreground">Submitted audit quality uses this month. Corrective-action counts include all dates in the selected warehouse.</p></div></CardContent></Card>
+        <Card><CardContent className="grid gap-3 pt-5 sm:grid-cols-2"><div role="group" aria-label="Warehouse" className="space-y-1 flex items-center gap-2"><p className="text-sm font-medium">Warehouse</p><span className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-medium text-foreground border-transparent bg-muted">CENTRAL WAREHOUSE (#278)</span></div><div className="space-y-1"><Label htmlFor="checker-month">Reporting month</Label><Input id="checker-month" type="month" value={month} disabled={access.loading} onChange={e => { setMonth(e.target.value); clearSelection(); }} /><p className="text-xs text-muted-foreground">Submitted audit quality uses this month. Corrective-action counts include all dates in the selected warehouse.</p></div></CardContent></Card>
         <Tabs value={tab} onValueChange={value => { setTab(value); setSearch(''); }}><TabsList className="h-auto flex-wrap"><TabsTrigger id="checker-tab-overview" aria-controls="checker-panel-overview" value="overview">Overview</TabsTrigger><TabsTrigger id="checker-tab-audits" aria-controls="checker-panel-audits" value="audits">Audit Results</TabsTrigger><TabsTrigger id="checker-tab-actions" aria-controls="checker-panel-actions" value="actions">Corrective Actions</TabsTrigger></TabsList></Tabs>
         <section role="tabpanel" id={`checker-panel-${tab}`} aria-labelledby={`checker-tab-${tab}`} className="space-y-4">
         {tab === 'actions' && <Button variant="outline" size="sm" onClick={() => { setStatus('ALL'); setAssignedInput(''); setAssignedTo(''); setFilterError(''); setActionPage(1); setSearch(''); }}>Reset action filters</Button>}

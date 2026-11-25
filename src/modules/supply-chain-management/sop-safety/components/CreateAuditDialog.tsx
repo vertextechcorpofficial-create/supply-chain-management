@@ -15,6 +15,7 @@ import { createSopAuditSchema, type CreateSopAuditInput } from '../schemas/audit
 import { useCreateSopAudit } from '../hooks/useCreateSopAudit';
 import type { SopChecklist } from '../types';
 import { todayManila } from './SopShared';
+import { SOP_CENTRAL_WAREHOUSE_ID } from '../centralWarehouse';
 
 export function CreateAuditDialog({ checklists, onClose, onReviewAudits }: { checklists: SopChecklist[]; onClose: () => void; onReviewAudits: () => void }) {
     const [branches, setBranches] = useState<Branch[]>([]);
@@ -22,12 +23,9 @@ export function CreateAuditDialog({ checklists, onClose, onReviewAudits }: { che
     const { create, saving, error, uncertain, result } = useCreateSopAudit();
     const form = useForm<CreateSopAuditInput>({
         resolver: zodResolver(createSopAuditSchema),
-        defaultValues: { auditDate: todayManila(), area: '', remarks: '' },
+        defaultValues: { branchId: SOP_CENTRAL_WAREHOUSE_ID, auditDate: todayManila(), area: '', remarks: '' },
     });
     const checklistId = useWatch({ control: form.control, name: 'checklistId' });
-    const branchId = useWatch({ control: form.control, name: 'branchId' });
-    const selected = checklists.find(checklist => checklist.id === checklistId);
-    const options = branches.filter(branch => selected?.branchId == null || branch.id === selected.branchId);
     const completed = result !== undefined;
 
     useEffect(() => {
@@ -52,20 +50,13 @@ export function CreateAuditDialog({ checklists, onClose, onReviewAudits }: { che
                         <Select value={checklistId ? String(checklistId) : ''} onValueChange={value => {
                             // These Select controls use setValue, not native registered inputs.
                             // Reset explicitly so an old warehouse cannot survive a scope change.
-                            form.reset({ ...form.getValues(), checklistId: Number(value), branchId: undefined });
+                            form.reset({ ...form.getValues(), checklistId: Number(value), branchId: SOP_CENTRAL_WAREHOUSE_ID });
                         }}><SelectTrigger id="sop-checklist" className="h-9 w-full" aria-invalid={!!form.formState.errors.checklistId} aria-describedby={form.formState.errors.checklistId ? 'sop-checklist-error' : undefined}><SelectValue placeholder="Select an active checklist" /></SelectTrigger>
                             <SelectContent>{checklists.filter(checklist => checklist.active).map(checklist => <SelectItem key={checklist.id} value={String(checklist.id)}>{checklist.name}</SelectItem>)}</SelectContent>
                         </Select>
                         {form.formState.errors.checklistId && <p id="sop-checklist-error" role="alert" className="text-xs text-destructive">Select a checklist.</p>}
                     </div>
-                    <div className="space-y-1 sm:col-span-2"><Label className="text-xs" htmlFor="sop-warehouse">Warehouse *</Label>
-                        <Select disabled={loadingBranches || !selected} value={branchId ? String(branchId) : ''} onValueChange={value => form.setValue('branchId', Number(value), { shouldValidate: true })}>
-                            <SelectTrigger id="sop-warehouse" className="h-9 w-full" aria-invalid={!!form.formState.errors.branchId} aria-describedby={form.formState.errors.branchId ? 'sop-warehouse-error' : undefined}><SelectValue placeholder={loadingBranches ? 'Loading warehouses…' : 'Select warehouse'} /></SelectTrigger>
-                            <SelectContent>{options.map(branch => <SelectItem key={branch.id} value={String(branch.id)}>{branch.branch_name}</SelectItem>)}</SelectContent>
-                        </Select>
-                        {!loadingBranches && branches.length === 0 && <p role="alert" className="text-xs text-destructive">Warehouses are unavailable. Close and reopen to try again.</p>}
-                        {form.formState.errors.branchId && <p id="sop-warehouse-error" role="alert" className="text-xs text-destructive">Select a warehouse.</p>}
-                    </div>
+                    <div className="space-y-1 sm:col-span-2"><Label className="text-xs" htmlFor="sop-warehouse">Warehouse *</Label><div className="flex items-center gap-2"><span className="text-xs font-medium text-muted-foreground">CENTRAL WAREHOUSE (#278)</span><input type="hidden" {...form.register('branchId')} /></div>{!loadingBranches && branches.length === 0 && <p role="alert" className="text-xs text-destructive">Warehouses are unavailable. Close and reopen to try again.</p>}{form.formState.errors.branchId && <p id="sop-warehouse-error" role="alert" className="text-xs text-destructive">Select a warehouse.</p>}</div>
                     <div className="min-w-0 space-y-1"><Label className="text-xs" htmlFor="sop-audit-date">Audit date *</Label><Input className="h-9 min-w-0 text-sm" id="sop-audit-date" type="date" aria-invalid={!!form.formState.errors.auditDate} aria-describedby={form.formState.errors.auditDate ? 'sop-date-error' : undefined} {...form.register('auditDate')} />{form.formState.errors.auditDate && <p id="sop-date-error" role="alert" className="text-xs text-destructive">Enter a valid audit date.</p>}</div>
                     <div className="space-y-1"><Label className="text-xs" htmlFor="sop-area">Area</Label><Input className="h-9 text-sm" id="sop-area" {...form.register('area')} /></div>
                     <div className="space-y-1 sm:col-span-2"><Label className="text-xs" htmlFor="sop-remarks">Remarks</Label><Textarea className="min-h-16 text-sm" rows={2} id="sop-remarks" {...form.register('remarks')} /></div>

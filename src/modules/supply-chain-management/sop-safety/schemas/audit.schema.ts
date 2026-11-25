@@ -1,9 +1,10 @@
 import { z } from 'zod';
+import { sopCentralWarehouseId } from '../centralWarehouse';
 
 /** Request fields documented in the SOP guide. Auditor and status are server-owned. */
 export const createSopAuditSchema = z.object({
     checklistId: z.number().int().positive().safe(),
-    branchId: z.number().int().positive().safe(),
+    branchId: sopCentralWarehouseId,
     auditDate: z.iso.date(),
     area: z.string().optional(),
     remarks: z.string().optional(),

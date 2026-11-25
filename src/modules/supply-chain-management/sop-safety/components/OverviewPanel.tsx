@@ -10,7 +10,7 @@ import { cn } from '@/lib/utils';
 import { actionSchema, auditSchema, kpiSchema, outcomes, pageSchema, scheduleSchema } from '../schemas/response.schema';
 import { readSop } from '../services/sopClient';
 import { useSopResource } from '../hooks/useSopResource';
-import { SopError, SopLoading, SopSelect, todayManila, type LookupOption } from './SopShared';
+import { SopError, SopLoading, todayManila, type LookupOption } from './SopShared';
 import { SopEmptyState, SopFilterToolbar, SopSectionHeading } from './SopUi';
 import { ReportingPeriod } from './ReportingPeriod';
 import { sopStatusStyles } from '../utils/presentation';
@@ -18,7 +18,7 @@ import { useSopAccess } from './SopAccessProvider';
 import { CorrectiveActions } from './CorrectiveActions';
 import { SchedulesPanel } from './SchedulesPanel';
 
-export function OverviewPanel({ branch, branches, onBranch }: { branch: string; branches: LookupOption[]; onBranch: (value: string) => void }) {
+export function OverviewPanel({ branch, branches }: { branch: string; branches: LookupOption[] }) {
     const access = useSopAccess();
     const [from, setFrom] = useState(`${todayManila().slice(0, 7)}-01`);
     const [to, setTo] = useState(todayManila());
@@ -50,8 +50,8 @@ export function OverviewPanel({ branch, branches, onBranch }: { branch: string; 
         { label: 'Open actions', value: counts.data?.open?.toLocaleString(), icon: Wrench, color: 'text-orange-600 dark:text-orange-400', detail: 'Across all dates', loading: counts.loading },
     ];
     return <div className="space-y-4">
-        <SchedulesPanel branch={branch} branches={branches} onBranch={onBranch} recurringOnly />
-        <SopFilterToolbar><div className="w-full sm:w-60"><SopSelect label="Warehouse" value={branch} options={branches} onChange={onBranch} /></div><ReportingPeriod from={from} to={to} onFrom={setFrom} onTo={setTo} /><Button size="sm" variant="outline" className="h-9 sm:ml-auto" disabled={kpi.loading || counts.loading || scheduleCounts.loading} onClick={() => { kpi.reload(); counts.reload(); scheduleCounts.reload(); }}><RefreshCw className="mr-2 size-3.5" />Refresh</Button></SopFilterToolbar>
+        <SchedulesPanel branch={branch} branches={branches} recurringOnly />
+        <SopFilterToolbar><div className="w-full sm:w-60 flex items-center gap-2"><span className="text-sm font-medium text-muted-foreground">Warehouse</span><span className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-medium text-foreground border-transparent bg-muted">CENTRAL WAREHOUSE (#278)</span></div><ReportingPeriod from={from} to={to} onFrom={setFrom} onTo={setTo} /><Button size="sm" variant="outline" className="h-9 sm:ml-auto" disabled={kpi.loading || counts.loading || scheduleCounts.loading} onClick={() => { kpi.reload(); counts.reload(); scheduleCounts.reload(); }}><RefreshCw className="mr-2 size-3.5" />Refresh</Button></SopFilterToolbar>
         <SopError error={kpi.error} retry={kpi.reload} /><SopError error={counts.error} retry={counts.reload} />
         {access.roles.includes('VIEWER') && <section className="space-y-3 rounded-xl border border-amber-300 bg-amber-50/40 p-4 dark:border-amber-900 dark:bg-amber-950/20" aria-label="Open corrective cases"><div className="flex items-center gap-2"><Wrench className="size-5 text-amber-700 dark:text-amber-400" /><h2 className="text-base font-semibold">Open cases requiring attention</h2></div><p className="text-xs text-muted-foreground">Open corrective actions for the selected warehouse, across all dates. Overdue due dates are highlighted below.</p><CorrectiveActions key={branch} branch={branch} openOnly onChanged={counts.reload} /></section>}
         <div className="grid min-w-0 grid-cols-2 gap-3 lg:grid-cols-5">{metrics.map((metric, index) => <Card key={metric.label} className={cn('gap-0 rounded-xl py-0 shadow-xs', index === 0 && 'border-primary/20')}><CardContent className="p-4"><div className="flex items-center justify-between gap-2"><p className="text-xs font-medium text-muted-foreground">{metric.label}</p><metric.icon className={cn('size-4 shrink-0', metric.color)} aria-hidden="true" /></div>{metric.loading ? <Skeleton className="my-2 h-8 w-20" /> : <p className={cn('my-1.5 truncate text-2xl font-semibold tracking-tight tabular-nums', index === 0 && 'text-primary')} title={metric.value ?? 'Unavailable'}>{metric.value ?? '—'}</p>}<p className="text-[11px] text-muted-foreground">{metric.detail}</p></CardContent></Card>)}</div>

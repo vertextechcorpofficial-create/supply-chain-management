@@ -5,10 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { readSpringHousekeeping, writeSpringHousekeeping } from './service';
 import { dummyWarehouses, springChecklistListSchema, springChecklistDetailSchema, springSections, type SpringChecklist, type SpringChecklistDetail } from './contracts';
+import { CENTRAL_WAREHOUSE_ID } from '../shared/warehouse';
 import { parseContract } from './workflow';
 import { WorkflowForm, type FormField } from './WorkflowForm';
 
-const checklistFields: FormField[] = [{ name: 'name', label: 'Checklist name', required: true }, { name: 'description', label: 'Description', type: 'textarea' }, { name: 'branchId', label: 'Warehouse', type: 'select', options: [{ value: 'all', label: 'All warehouses' }, ...dummyWarehouses.map(w => ({ value: String(w.id), label: w.name }))] }, { name: 'frequency', label: 'Frequency', type: 'select', required: true, options: ['Daily', 'Weekly', 'Monthly'].map(value => ({ value, label: value })) }, { name: 'maxGrade', label: 'Maximum grade', type: 'number', min: 1, max: 100, required: true }];
+const checklistFields: FormField[] = [{ name: 'name', label: 'Checklist name', required: true }, { name: 'description', label: 'Description', type: 'textarea' }, { name: 'branchId', label: 'Warehouse', type: 'select', options: [{ value: 'all', label: 'All warehouses' }, ...dummyWarehouses.map(w => ({ value: String(w.id), label: w.name }))] }, { name: 'frequency', label: 'Frequency', type: 'select', required: true, options: ['Weekly', 'Monthly'].map(value => ({ value, label: value })) }, { name: 'maxGrade', label: 'Maximum grade', type: 'number', min: 1, max: 100, required: true }];
 const itemFields: FormField[] = [{ name: 'section', label: '5S section', type: 'select', required: true, options: springSections.map(value => ({ value, label: value })) }, { name: 'description', label: 'Criterion', type: 'textarea', required: true }, { name: 'weight', label: 'Weight', type: 'number', min: 0.01, required: true }, { name: 'sortOrder', label: 'Display order', type: 'number', required: true }];
 export function ChecklistManager({ onClose }: { onClose: () => void }) {
     const [list, setList] = useState<SpringChecklist[]>([]);
@@ -24,11 +25,11 @@ export function ChecklistManager({ onClose }: { onClose: () => void }) {
     useEffect(() => { const controller = new AbortController();
         Promise.all([readSpringHousekeeping('checklists', new URLSearchParams(), controller.signal), id ? readSpringHousekeeping(`checklists/${Number(id)}`, new URLSearchParams(), controller.signal) : Promise.resolve(null)]).then(([rows, d]) => {
             const parsed = parseContract(springChecklistListSchema, rows); const value = d === null ? undefined : parseContract(springChecklistDetailSchema, d);
-            if (!controller.signal.aborted) { setList(parsed); setDetail(value); setError(''); setSettledKey(requestKey); }
+            if (!controller.signal.aborted) { setList(parsed.filter(c => c.branchId === null || c.branchId === CENTRAL_WAREHOUSE_ID)); setDetail(value); setError(''); setSettledKey(requestKey); }
         }).catch(e => { if (!controller.signal.aborted) { setError(e instanceof Error ? e.message : 'Checklist load failed'); setSettledKey(requestKey); } });
         return () => controller.abort();
     }, [id, version, requestKey]);
-    const editChecklist = (current?: SpringChecklist) => setForm({ title: current ? 'Edit checklist' : 'Create checklist', fields: checklistFields, initial: current ? { name: current.name, description: current.description ?? '', branchId: current.branchId === null ? 'all' : String(current.branchId), frequency: current.frequency, maxGrade: String(current.maxGrade) } : { frequency: 'Weekly', maxGrade: '5', branchId: 'all' }, save: async v => {
+    const editChecklist = (current?: SpringChecklist) => setForm({ title: current ? 'Edit checklist' : 'Create checklist', fields: checklistFields, initial: current ? { name: current.name, description: current.description ?? '', branchId: current.branchId === null ? 'all' : String(current.branchId), frequency: current.frequency, maxGrade: String(current.maxGrade) } : { frequency: 'Weekly', maxGrade: '5', branchId: String(CENTRAL_WAREHOUSE_ID) }, save: async v => {
         await writeSpringHousekeeping(current ? `checklists/${current.id}` : 'checklists', current ? 'PUT' : 'POST', { name: v.name, description: v.description || '', branchId: !v.branchId || v.branchId === 'all' ? null : Number(v.branchId), frequency: v.frequency, maxGrade: Number(v.maxGrade), active: current?.active ?? true }); reload();
     } });
     return <Dialog open onOpenChange={open => { if (!open) onClose(); }}><DialogContent className="flex max-h-[90dvh] flex-col overflow-hidden sm:max-w-3xl"><DialogHeader><DialogTitle>Housekeeping checklists</DialogTitle><DialogDescription>Configure future audits. Saved scores are preserved. Disable items instead of deleting history.</DialogDescription></DialogHeader>

@@ -27,7 +27,7 @@ export function ChecklistAdmin({ checklist, detail, onChanged }: { checklist?: S
     const fields: SopField[] = [
         { name: 'name', label: 'Checklist name', required: true }, { name: 'description', label: 'Description', type: 'textarea' },
         { name: 'branchId', label: 'Warehouse applicability', type: 'select', required: true, options: [{ value: 'GLOBAL', label: 'All warehouses' }, ...lookup.branches] },
-        { name: 'frequency', label: 'Frequency', type: 'select', required: true, options: ['Daily', 'Weekly', 'Monthly'].map(value => ({ value, label: value })) },
+        { name: 'frequency', label: 'Frequency', type: 'select', required: true, options: ['Weekly', 'Monthly'].map(value => ({ value, label: value })) },
         { name: 'maxGrade', label: 'Maximum grade', type: 'number', min: 0, required: true },
         { name: 'active', label: 'Status', type: 'select', required: true, options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] },
     ];

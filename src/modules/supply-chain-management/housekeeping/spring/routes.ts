@@ -1,4 +1,5 @@
 /** Route + method allowlist; never proxy arbitrary Spring paths. */
+import { CENTRAL_WAREHOUSE_ID } from '../shared/warehouse';
 export function springHousekeepingPath(segments: string[], method = 'GET'): string | null {
     const path = segments.join('/');
     if (method !== 'GET') {
@@ -35,5 +36,6 @@ export function springHousekeepingQuery(resource: string, input: URLSearchParams
         result.set(key, value);
     }
     if (result.has('from') && result.has('to') && result.get('from')! > result.get('to')!) throw new Error('Start date must not follow end date');
+    if (result.has('branchId') && result.get('branchId') !== String(CENTRAL_WAREHOUSE_ID)) throw new Error('Housekeeping is limited to the Central Warehouse.');
     return result;
 }

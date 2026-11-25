@@ -8,6 +8,7 @@ import { housekeepingRoles } from '../checker/permissions';
 import { EvaluationError, moduleAccess, secureEndpoint, verifySession } from './security';
 import { saveReadiness, weeklyReadiness, submissionReadiness } from './save-readiness';
 import { evaluationToken } from './configuration';
+import { CENTRAL_WAREHOUSE_ID } from '../shared/warehouse';
 
 export async function currentAccess() {
     const token = (await cookies()).get(COOKIE_NAME)?.value;
@@ -31,7 +32,7 @@ export async function currentAccess() {
             throw new EvaluationError(403, 'FORBIDDEN', 'You have not been granted access to the evaluation module');
         }
     }
-    const branches = await readItems('branches', ['id', 'branch_name', 'branch_code', 'isActive'], { isActive: { _eq: 1 } }, warehouseSchema);
+    const branches = await readItems('branches', ['id', 'branch_name', 'branch_code', 'isActive'], { id: { _eq: CENTRAL_WAREHOUSE_ID }, isActive: { _eq: 1 } }, warehouseSchema);
     return { ...moduleAccess(actor.userId, branches.map(branch => branch.id)), savesEnabled: await saveReadiness(), weeklySavesEnabled: await weeklyReadiness(), submissionEnabled: await submissionReadiness() };
 }
 /** Read-only, explicit fields, bounded pagination. No generic proxy or write helper. */
