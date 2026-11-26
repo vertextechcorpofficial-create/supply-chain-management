@@ -7,6 +7,8 @@ export const sopChecklistSchema = z.object({
     description: z.string().nullable(),
     branchId: z.number().int().positive().safe().nullable(),
     frequency: z.enum(['Daily', 'Weekly', 'Monthly']),
+    weekday: z.number().int().min(1).max(7).nullish(),
+    dayOfMonth: z.number().int().min(1).max(28).nullish(),
     maxGrade: z.number().finite().positive(),
     active: z.boolean(),
     createdAt: z.string(),

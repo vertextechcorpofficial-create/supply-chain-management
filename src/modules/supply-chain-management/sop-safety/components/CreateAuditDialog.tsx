@@ -17,13 +17,13 @@ import type { SopChecklist } from '../types';
 import { todayManila } from './SopShared';
 import { SOP_CENTRAL_WAREHOUSE_ID } from '../centralWarehouse';
 
-export function CreateAuditDialog({ checklists, onClose, onReviewAudits }: { checklists: SopChecklist[]; onClose: () => void; onReviewAudits: () => void }) {
+export function CreateAuditDialog({ checklists, initialDate, onClose, onReviewAudits }: { checklists: SopChecklist[]; initialDate?: string; onClose: () => void; onReviewAudits: () => void }) {
     const [branches, setBranches] = useState<Branch[]>([]);
     const [loadingBranches, setLoadingBranches] = useState(true);
     const { create, saving, error, uncertain, result } = useCreateSopAudit();
     const form = useForm<CreateSopAuditInput>({
         resolver: zodResolver(createSopAuditSchema),
-        defaultValues: { branchId: SOP_CENTRAL_WAREHOUSE_ID, auditDate: todayManila(), area: '', remarks: '' },
+        defaultValues: { branchId: SOP_CENTRAL_WAREHOUSE_ID, auditDate: initialDate ?? todayManila(), area: '', remarks: '' },
     });
     const checklistId = useWatch({ control: form.control, name: 'checklistId' });
     const completed = result !== undefined;

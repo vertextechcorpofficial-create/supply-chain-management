@@ -66,7 +66,7 @@ export function HousekeepingWorkspace({ mode }: { mode: 'auditor' | 'checker' | 
         const fetchData = async () => {
         const range = monthRange(month);
         const common = { branchId: branch, from: range.from, to: range.through };
-        const list = new URLSearchParams({ ...common, page: String(page), pageSize: '25', ...(status === 'ALL' ? {} : isAuditorOrChecker ? { status } : { outcome: status }) });
+        const list = new URLSearchParams({ ...common, page: String(page), pageSize: '25', ...(status === 'ALL' || mode === 'auditor' ? {} : isAuditorOrChecker ? { status } : { outcome: status }) });
         const [c, k, rows, plans, planned] = await Promise.all([
             readSpringHousekeeping('checklists', new URLSearchParams(), controller.signal),
             readSpringHousekeeping('kpi', new URLSearchParams(common), controller.signal),
@@ -108,7 +108,7 @@ export function HousekeepingWorkspace({ mode }: { mode: 'auditor' | 'checker' | 
     const changeScope = () => { setPage(1); setDay(undefined); setSelected(null); setForm(undefined); };
     const canShow = !loading && !error;
     const dayKey = day ? `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}` : '';
-    const shownAudits = audits.filter(a => (!dayKey || a.auditDate === dayKey) && `${a.auditNo} ${a.area ?? ''} ${a.checkedBy ?? ''}`.toLowerCase().includes(search.toLowerCase()));
+    const shownAudits = audits.filter(a => (!dayKey || a.auditDate === dayKey) && (status === 'ALL' || mode !== 'auditor' || a.status === status) && `${a.auditNo} ${a.area ?? ''} ${a.checkedBy ?? ''}`.toLowerCase().includes(search.toLowerCase()));
     const shownSchedules = schedules.filter(s => (!dayKey || s.scheduledDate === dayKey) && `${s.auditNo ?? ''} ${s.scheduledDate} ${s.outcome}`.toLowerCase().includes(search.toLowerCase()));
     const Icon = mode === 'scheduler' ? CalendarDays : ClipboardCheck;
     const auditorTable = (
@@ -194,10 +194,29 @@ export function HousekeepingWorkspace({ mode }: { mode: 'auditor' | 'checker' | 
             </div>
         </>
     );
+    const auditedDates = new Set(audits.map(a => a.auditDate));
+    const upcomingAuditDates = [...new Set([...upcomingSchedules.map(schedule => schedule.scheduledDate), ...upcomingPlanDates])].sort().filter(date => !auditedDates.has(date));
+    const startAuditOnDate = async (date: string, checklistId: number) => {
+        const result = await writeSpringHousekeeping('audits', 'POST', { branchId: Number(branch), checklistId, auditDate: date, area: '', remarks: '' });
+        reload();
+        setSelected(createdAuditId(result));
+    };
+    const openStartAuditForm = (date: string) => setForm({ title: 'Start Housekeeping audit', description: 'Creates a draft with you recorded as auditor.', fields: [{ name: 'checklistId', label: 'Checklist', type: 'select', required: true, options: available.map(c => ({ value: String(c.id), label: `${c.name} · ${c.frequency} · max ${c.maxGrade}` })) }, { name: 'auditDate', label: 'Audit date', type: 'date', required: true }, { name: 'area', label: 'Area / zone' }, { name: 'remarks', label: 'General remarks', type: 'textarea' }], initial: { auditDate: date, checklistId: String(available[0].id) }, save: async v => { await startAuditOnDate(v.auditDate, Number(v.checklistId)); } });
+    const today = manilaToday();
+    const UpcomingAuditCard = ({ date }: { date: string }) => {
+        const isFuture = date > today;
+        return (
+            <Card key={date} className="border-amber-200">
+                <CardHeader className="px-3 py-2 bg-amber-50/50"><CardTitle className="text-sm font-semibold text-amber-900">{date}</CardTitle></CardHeader>
+                <CardContent className="px-3 py-2"><Button size="sm" className="w-full" disabled={isFuture} onClick={() => openStartAuditForm(date)}>{isFuture ? 'Locked' : 'Start Audit'}</Button></CardContent>
+            </Card>
+        );
+    };
+    const upcomingAuditsView = upcomingAuditDates.map((date) => <UpcomingAuditCard key={date} date={date} />);
     return <div className="space-y-6">
         <div className="flex flex-wrap items-start justify-between gap-4"><div className="flex items-center gap-3"><div className="rounded-xl bg-primary/10 p-3 text-primary"><Icon className="size-7" /></div><div><h1 className="text-2xl font-semibold tracking-tight">Housekeeping {mode === 'scheduler' ? 'Scheduler' : mode === 'checker' ? 'Checker' : 'Auditor'}</h1><p className="text-sm text-muted-foreground">Warehouse 5S audits · {warehouse?.name}</p></div></div><Button variant="outline" disabled={loading} onClick={reload}><RefreshCw className="mr-2 size-4" />Refresh</Button></div>
          <Alert><AlertDescription>Answer every criterion with a score or N/A. N/A is excluded from scoring. Missed schedules affect completion coverage, not quality scores. Planned dates are linked automatically on submission.</AlertDescription></Alert>
-         {mode === 'auditor' && (upcomingSchedules.length > 0 || upcomingPlanDates.length > 0) && <Alert className="border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100"><AlertDescription><strong>Upcoming audit this week:</strong> {[...new Set([...upcomingSchedules.map(schedule => schedule.scheduledDate), ...upcomingPlanDates])].sort().join(', ')}</AlertDescription></Alert>}
+         {mode === 'auditor' && upcomingAuditsView.length > 0 && <Card className="border-amber-300 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/30"><CardHeader className="px-3 py-2 bg-amber-50/50 dark:bg-amber-950/10"><CardTitle className="text-sm font-semibold text-amber-950 dark:text-amber-100">Upcoming audit this week</CardTitle><p className="text-xs text-amber-900 dark:text-amber-200">{upcomingAuditDates.join(', ')}</p></CardHeader><CardContent className="space-y-3"><p className="text-sm text-muted-foreground">Scheduled audit dates for this week. Start an audit on any planned date.</p><div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-4">{upcomingAuditsView}</div></CardContent></Card>}
         {!loading && error && <Alert variant="destructive"><AlertDescription>{error} <Button variant="outline" size="sm" onClick={reload}>Retry</Button></AlertDescription></Alert>}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">{[{ label: '5S quality score', value: kpi?.scorePercent == null ? 'No data' : `${kpi.scorePercent.toFixed(2)}%`, color: 'COMPLETED' as const }, ...outcomes.map(outcome => ({ label: outcome, value: String(kpi?.schedule[({ Upcoming: 'upcoming', Due: 'due', Done: 'done', 'Done late': 'doneLate', Missed: 'missed', Cancelled: 'cancelled' } as const)[outcome]] ?? 0), color: outcomeStyle[outcome] }))].map(card => <Card key={card.label}><CardHeader className="px-3 py-2"><CardTitle className="text-xs font-medium text-muted-foreground">{card.label}</CardTitle></CardHeader><CardContent className="px-3 pb-3">{loading ? <Skeleton className="h-7 w-12" /> : <p className={`inline-block rounded-md border px-2 text-xl font-semibold ${statusColors[card.color]}`}>{canShow ? card.value : '—'}</p>}</CardContent></Card>)}</div>
         {canShow && kpi && <p className="text-sm text-muted-foreground">Audits done: {kpi.schedule.done + kpi.schedule.doneLate} of {kpi.schedule.counted} settled · {kpi.schedule.donePercent == null ? 'No settled schedules' : `${kpi.schedule.donePercent.toFixed(2)}% completion`} · {kpi.audits} submitted audits{ kpi.scorePercent === null && kpi.schedule.counted > 0 ? ' · Not audited' : ''}</p>}

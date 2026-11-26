@@ -32,8 +32,6 @@ export function OverviewPanel({ branch, branches }: { branch: string; branches: 
         const [total, submitted, drafts, open] = await Promise.all([count(), count('Submitted'), count('Draft'), readSop('corrective-actions', pageSchema('actions', actionSchema), new URLSearchParams({ status: 'Open', page: '1', pageSize: '1', ...(branch !== 'ALL' ? { branchId: branch } : {}) }), signal)]);
         return { total, submitted, drafts, open: open.total };
     });
-    // Schedule outcomes are intentionally not tied to the compliance period: "Upcoming" would
-    // otherwise always be zero because the default period ends today.
     const scheduleCounts = useSopResource(`schedule-counts:${branch}`, async signal => {
         const entries = await Promise.all(outcomes.map(async outcome => {
             const result = await readSop('schedules', pageSchema('schedules', scheduleSchema), new URLSearchParams({ ...(branch !== 'ALL' ? { branchId: branch } : {}), outcome, page: '1', pageSize: '1' }), signal);

@@ -41,9 +41,12 @@ function SopWorkspace({ initialTab, workspace }: { initialTab: string; workspace
     const [status, setStatus] = useState<ChecklistStatusFilter>('ALL');
     const [selected, setSelected] = useState<SopChecklist | null>(null);
     const [creating, setCreating] = useState(false);
+    const [pendingAuditDate, setPendingAuditDate] = useState<string | null>(null);
     const query = search.trim().toLocaleLowerCase();
     const visibleChecklists = workspace === 'INSPECTOR' ? checklists.filter(row => row.frequency !== 'Daily') : checklists;
     const rows = visibleChecklists.filter(row => (status === 'ALL' || row.active === (status === 'ACTIVE')) && (!query || `${row.name} ${row.description || ''}`.toLocaleLowerCase().includes(query)));
+
+    const handleStartAuditDate = (date: string) => { setPendingAuditDate(date); setCreating(true); };
 
     return <div className="flex min-w-0 w-full flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3"><div className="flex min-w-0 items-start gap-3"><div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><ShieldCheck className="size-5" /></div><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">SOP &amp; Safety Compliance</h1><span className="rounded-md border bg-background px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">{workspace.charAt(0) + workspace.slice(1).toLowerCase()}</span></div><p className="mt-1 text-xs text-muted-foreground sm:text-sm">Monitor warehouse safety compliance, audits, and corrective actions.</p></div></div>{access.inspect && <Button size="sm" disabled={loading || !!error || !checklists.some(checklist => checklist.active)} onClick={() => setCreating(true)}><Plus className="mr-1.5 size-4" />New audit</Button>}</div>
@@ -55,8 +58,8 @@ function SopWorkspace({ initialTab, workspace }: { initialTab: string; workspace
         {initialTab === 'audits' && <AuditsPanel branch={branch} checklists={checklists} />}
         {initialTab === 'checklists' && <Card className="gap-4 rounded-xl py-4 shadow-xs"><CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 px-4 py-0"><CardTitle className="text-sm">Checklists</CardTitle><ChecklistAdmin onChanged={() => { void fetchChecklists(); }} /></CardHeader><CardContent className="space-y-3 px-4 py-0"><ChecklistFilters search={search} status={status} loading={loading} onSearchChange={setSearch} onStatusChange={setStatus} onRefresh={() => { void fetchChecklists(); }} />{error ? <SopError error={new Error(error)} /> : <><ChecklistTable rows={rows} loading={loading} onOpen={setSelected} />{!loading && <p className="text-xs text-muted-foreground">Showing {rows.length} of {checklists.length} checklists.</p>}</>}</CardContent></Card>}
         {initialTab === 'corrective-actions' && <Card className="gap-0 rounded-xl py-0 shadow-xs"><CardContent className="p-4"><CorrectiveActions branch={branch} /></CardContent></Card>}
-        {initialTab === 'schedules' && <Card className="gap-0 rounded-xl py-0 shadow-xs"><CardContent className="p-4"><SchedulesPanel branch={branch} branches={lookup.branches} /></CardContent></Card>}
+        {initialTab === 'schedules' && <Card className="gap-0 rounded-xl py-0 shadow-xs"><CardContent className="p-4"><SchedulesPanel branch={branch} branches={lookup.branches} onStartAuditDate={handleStartAuditDate} /></CardContent></Card>}
         <ChecklistDetailDialog key={selected?.id ?? 'closed'} checklist={selected} onClose={() => setSelected(null)} onChanged={() => { void fetchChecklists(); }} />
-        {access.inspect && creating && <CreateAuditDialog checklists={visibleChecklists} onClose={() => setCreating(false)} onReviewAudits={() => { setCreating(false); router.push('/scm/sop-safety/inspector/audits'); }} />}
+        {access.inspect && creating && <CreateAuditDialog checklists={visibleChecklists} initialDate={pendingAuditDate ?? undefined} onClose={() => { setCreating(false); setPendingAuditDate(null); }} onReviewAudits={() => { setCreating(false); setPendingAuditDate(null); router.push('/scm/sop-safety/inspector/audits'); }} />}
     </div>;
 }
