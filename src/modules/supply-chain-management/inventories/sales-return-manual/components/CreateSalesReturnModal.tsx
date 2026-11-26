@@ -14,6 +14,7 @@ import {
   Loader2,
   Check,
   ChevronsUpDown,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -206,6 +207,7 @@ export function CreateSalesReturnModal({ isOpen, onClose, onSuccess }: Props) {
   // Success Modal State
   const [isSuccessOpen, setSuccessOpen] = useState(false);
   const [isConfirmCreateOpen, setIsConfirmCreateOpen] = useState(false);
+  const [isUnsavedConfirmOpen, setIsUnsavedConfirmOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // UI State for Validation
@@ -569,6 +571,22 @@ export function CreateSalesReturnModal({ isOpen, onClose, onSuccess }: Props) {
     setInvoiceOptions([]);
   };
 
+  const checkIfDirty = () => {
+    if (items.length > 0) return true;
+    if (selectedSalesmanId || selectedCustomerId) return true;
+    if (orderNo || invoiceNo || remarks) return true;
+    if (isThirdParty) return true;
+    return false;
+  };
+
+  const handleCloseAttempt = () => {
+    if (checkIfDirty()) {
+      setIsUnsavedConfirmOpen(true);
+    } else {
+      handleClose();
+    }
+  };
+
   const handleClose = () => {
     resetForm();
     onClose();
@@ -846,7 +864,7 @@ export function CreateSalesReturnModal({ isOpen, onClose, onSuccess }: Props) {
           </div>
 
           <button
-            onClick={handleClose}
+            onClick={handleCloseAttempt}
             className="bg-destructive hover:bg-destructive text-white p-2 rounded-md shadow-sm transition-all duration-200 active:scale-95 flex items-center justify-center"
             title="Close"
           >
@@ -1641,7 +1659,7 @@ export function CreateSalesReturnModal({ isOpen, onClose, onSuccess }: Props) {
 
         {/* FOOTER ACTIONS */}
         <div className="p-4 bg-background border-t border-border flex justify-end gap-3 z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-          <Button variant="outline" onClick={handleClose}>
+          <Button variant="outline" onClick={handleCloseAttempt}>
             Cancel
           </Button>
           <Button
@@ -1731,6 +1749,51 @@ export function CreateSalesReturnModal({ isOpen, onClose, onSuccess }: Props) {
               className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-base rounded-xl shadow-primary/20 shadow-lg transition-all active:scale-95"
             >
               Done
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* UNSAVED CHANGES MODAL */}
+      <Dialog
+        open={isUnsavedConfirmOpen}
+        onOpenChange={setIsUnsavedConfirmOpen}
+      >
+        <DialogContent
+          className="max-w-[420px] p-6 bg-background rounded-xl shadow-2xl border border-border"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <div className="flex flex-col items-center text-center gap-4">
+            <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
+              <AlertTriangle className="h-6 w-6 text-destructive" />
+            </div>
+            <div className="space-y-2">
+              <DialogTitle className="text-lg font-bold text-foreground">
+                Unsaved Changes
+              </DialogTitle>
+              <div className="text-sm text-muted-foreground">
+                You have unsaved changes. How would you like to proceed?
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2 mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setIsUnsavedConfirmOpen(false)}
+              className="w-full font-semibold"
+            >
+              Stay and Continue Editing
+            </Button>
+            <Button
+              onClick={() => {
+                setIsUnsavedConfirmOpen(false);
+                handleClose();
+              }}
+              variant="destructive"
+              className="w-full font-semibold"
+            >
+              Leave and Discard Changes
             </Button>
           </div>
         </DialogContent>
