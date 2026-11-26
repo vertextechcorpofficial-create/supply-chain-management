@@ -261,7 +261,11 @@ export function ProductLookupModal({
    * Resolves the correct unit price based on the selected priceType.
    */
   const resolvePrice = (product: Product, currentType: string): number => {
-    const key = `price${currentType}` as keyof Product;
+    const cleanType = String(currentType || "").trim().toUpperCase();
+    if (product.priceByType && product.priceByType[cleanType] !== undefined) {
+      return Number(product.priceByType[cleanType]);
+    }
+    const key = `price${cleanType}` as keyof Product;
     const price = Number(product[key]) || Number(product.priceA) || 0;
     return price;
   };
@@ -348,6 +352,7 @@ export function ProductLookupModal({
           priceC: product.priceC,
           priceD: product.priceD,
           priceE: product.priceE,
+          priceByType: product.priceByType,
           unitMultiplier: product.unit_of_measurement_count || 1,
           unitOrder: unitOrder,
         };

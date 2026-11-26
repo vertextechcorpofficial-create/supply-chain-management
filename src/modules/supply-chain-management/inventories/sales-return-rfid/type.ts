@@ -28,6 +28,7 @@ export interface SalesReturnItem {
   priceC?: number;
   priceD?: number;
   priceE?: number;
+  priceByType?: Record<string, number>;
   unitMultiplier?: number;
   unitOrder?: number;
 }
@@ -101,6 +102,14 @@ export interface Product {
   priceC?: number;
   priceD?: number;
   priceE?: number;
+  priceByType?: Record<string, number>;
+}
+
+export interface ProductPerPriceTypeRow {
+  id: number;
+  product_id: number;
+  price_type_id: number;
+  price: number | null;
 }
 
 // ... rest of the file ...

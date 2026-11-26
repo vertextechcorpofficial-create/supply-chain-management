@@ -326,13 +326,65 @@ export async function fetchProductCatalog(
   products: Product[];
 }> {
   const catalogData = await repo.getRawProductCatalog(includeInactive);
-  const [brandsRes, categoriesRes, suppliersRes, unitsRes, connectionsRes, productsRes] = catalogData;
+  const [
+    brandsRes,
+    categoriesRes,
+    suppliersRes,
+    unitsRes,
+    connectionsRes,
+    productsRes,
+    productPerPriceTypeRes,
+    priceTypesRes,
+  ] = catalogData;
 
   let scdpcRes = { data: [] as any[] };
 
   if (customerCode) {
     scdpcRes = await repo.getRawSupplierCategoryDiscount(customerCode);
   }
+
+  // Build price type name lookup map: price_type_id -> price_type_name
+  const priceTypeMap = new Map<number, string>();
+  for (const pt of (priceTypesRes?.data || []) as any[]) {
+    const ptId = Number(pt.price_type_id || pt.id);
+    const ptName = String(pt.price_type_name || pt.name || "").trim().toUpperCase();
+    if (ptId && ptName) {
+      priceTypeMap.set(ptId, ptName);
+    }
+  }
+
+  // Build product -> price_type_name -> price map from product_per_price_type
+  const productPriceTypeMap = new Map<number, Record<string, number>>();
+  for (const row of (productPerPriceTypeRes?.data || []) as any[]) {
+    const prodId = Number(row.product_id);
+    const ptId = Number(row.price_type_id);
+    const priceVal = row.price !== null && row.price !== undefined ? Number(row.price) : null;
+    if (prodId && ptId && priceVal !== null && !isNaN(priceVal)) {
+      const typeName = priceTypeMap.get(ptId);
+      if (typeName) {
+        if (!productPriceTypeMap.has(prodId)) {
+          productPriceTypeMap.set(prodId, {});
+        }
+        productPriceTypeMap.get(prodId)![typeName] = priceVal;
+      }
+    }
+  }
+
+  const rawProducts = (productsRes.data || []) as unknown as Product[];
+  const enrichedProducts: Product[] = rawProducts.map((p) => {
+    const prodId = Number(p.product_id);
+    const priceByType = productPriceTypeMap.get(prodId) || {};
+    return {
+      ...p,
+      priceByType,
+      // If product_per_price_type provides pricing, also enrich or fallback priceA..priceE
+      priceA: priceByType["A"] !== undefined ? priceByType["A"] : p.priceA,
+      priceB: priceByType["B"] !== undefined ? priceByType["B"] : p.priceB,
+      priceC: priceByType["C"] !== undefined ? priceByType["C"] : p.priceC,
+      priceD: priceByType["D"] !== undefined ? priceByType["D"] : p.priceD,
+      priceE: priceByType["E"] !== undefined ? priceByType["E"] : p.priceE,
+    };
+  });
 
   const connections = ((connectionsRes.data || []) as any[]).map((item: any) => ({
     id: item.id,
@@ -359,7 +411,7 @@ export async function fetchProductCatalog(
     units: (unitsRes.data || []) as unknown as Unit[],
     connections: connections as ProductSupplierConnection[],
     supplierCategoryDiscount,
-    products: (productsRes.data || []) as unknown as Product[],
+    products: enrichedProducts,
   };
 }
 

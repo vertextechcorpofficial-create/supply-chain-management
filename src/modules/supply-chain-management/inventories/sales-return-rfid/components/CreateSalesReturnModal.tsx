@@ -340,8 +340,13 @@ export function CreateSalesReturnModal({ isOpen, onClose, onSuccess }: Props) {
    * Falls back to priceA if the specific price type is not available.
    */
   const resolvePrice = (product: SalesReturnItem | Record<string, unknown>, currentPriceType: string): number => {
-    const key = `price${currentPriceType}`;
+    const cleanType = String(currentPriceType || "").trim().toUpperCase();
     const productRecord = product as Record<string, unknown>;
+    const priceByType = productRecord.priceByType as Record<string, number> | undefined;
+    if (priceByType && priceByType[cleanType] !== undefined) {
+      return Math.round(Number(priceByType[cleanType]) * 100) / 100;
+    }
+    const key = `price${cleanType}`;
     const price = Number(productRecord[key]) || Number(productRecord.priceA) || Number(productRecord.unitPrice) || 0;
     return Math.round(price * 100) / 100;
   };
