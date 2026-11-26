@@ -198,6 +198,12 @@ export async function getRawProductCatalog(includeInactive = false) {
     directusGet<{ data: Record<string, unknown>[] }>(
       `/items/products?limit=-1${includeInactive ? "" : "&filter[isActive][_eq]=1"}`,
     ),
+    directusGet<{ data: Record<string, unknown>[] }>(
+      "/items/product_per_price_type?limit=-1",
+    ),
+    directusGet<{ data: Record<string, unknown>[] }>(
+      "/items/price_types?limit=-1&sort=sort",
+    ),
   ]);
 }
 
