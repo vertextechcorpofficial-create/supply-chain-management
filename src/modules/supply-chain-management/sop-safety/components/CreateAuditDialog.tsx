@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -18,6 +18,7 @@ import { todayManila } from './SopShared';
 import { SOP_CENTRAL_WAREHOUSE_ID } from '../centralWarehouse';
 
 export function CreateAuditDialog({ checklists, initialDate, onClose, onReviewAudits }: { checklists: SopChecklist[]; initialDate?: string; onClose: () => void; onReviewAudits: () => void }) {
+    const router = useRouter();
     const [branches, setBranches] = useState<Branch[]>([]);
     const [loadingBranches, setLoadingBranches] = useState(true);
     const { create, saving, error, uncertain, result } = useCreateSopAudit();
@@ -27,6 +28,12 @@ export function CreateAuditDialog({ checklists, initialDate, onClose, onReviewAu
     });
     const checklistId = useWatch({ control: form.control, name: 'checklistId' });
     const completed = result !== undefined;
+
+    useEffect(() => {
+        if (!result) return;
+        onClose();
+        router.push(`/scm/sop-safety/inspector/audits/${result.audit.id}`);
+    }, [result, onClose, router]);
 
     useEffect(() => {
         let active = true;
@@ -57,8 +64,7 @@ export function CreateAuditDialog({ checklists, initialDate, onClose, onReviewAu
                         {form.formState.errors.checklistId && <p id="sop-checklist-error" role="alert" className="text-xs text-destructive">Select a checklist.</p>}
                     </div>
                     <div className="space-y-1 sm:col-span-2"><Label className="text-xs" htmlFor="sop-warehouse">Warehouse *</Label><div className="flex items-center gap-2"><span className="text-xs font-medium text-muted-foreground">CENTRAL WAREHOUSE (#278)</span><input type="hidden" {...form.register('branchId')} /></div>{!loadingBranches && branches.length === 0 && <p role="alert" className="text-xs text-destructive">Warehouses are unavailable. Close and reopen to try again.</p>}{form.formState.errors.branchId && <p id="sop-warehouse-error" role="alert" className="text-xs text-destructive">Select a warehouse.</p>}</div>
-                    <div className="min-w-0 space-y-1"><Label className="text-xs" htmlFor="sop-audit-date">Audit date *</Label><Input className="h-9 min-w-0 text-sm" id="sop-audit-date" type="date" aria-invalid={!!form.formState.errors.auditDate} aria-describedby={form.formState.errors.auditDate ? 'sop-date-error' : undefined} {...form.register('auditDate')} />{form.formState.errors.auditDate && <p id="sop-date-error" role="alert" className="text-xs text-destructive">Enter a valid audit date.</p>}</div>
-                    <div className="space-y-1"><Label className="text-xs" htmlFor="sop-area">Area</Label><Input className="h-9 text-sm" id="sop-area" {...form.register('area')} /></div>
+                     <input type="hidden" {...form.register('auditDate')} />
                     <div className="space-y-1 sm:col-span-2"><Label className="text-xs" htmlFor="sop-remarks">Remarks</Label><Textarea className="min-h-16 text-sm" rows={2} id="sop-remarks" {...form.register('remarks')} /></div>
                 </fieldset>
                 {error && <p role="alert" className="px-5 pb-3 text-xs text-destructive">{error}</p>}

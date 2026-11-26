@@ -61,10 +61,10 @@ export function SchedulesPanel({ branch, branches, recurringOnly = false, onStar
         for (const rule of (rules.data ?? []).filter(rule => rule.active && rule.branchId === Number(branch))) {
             if (dateStr < rule.startDate) continue;
             if (rule.endDate && dateStr > rule.endDate) continue;
-            if (rule.frequency === 'Monthly' ? date.getDate() === rule.dayOfMonth : (date.getDay() || 7) === rule.weekday) upcomingRuleDates.push({ date: dateStr, label: `${rule.frequency} schedule` });
+            if (rule.frequency === 'Monthly' ? date.getDate() === rule.dayOfMonth : (date.getDay() || 7) === rule.weekday) upcomingRuleDates.push({ date: dateStr, label: `${rule.frequency} schedule #${rule.id}` });
         }
         for (const checklist of (checklists.data ?? []).filter(item => item.active && (item.branchId === null || item.branchId === Number(branch)))) {
-            if (checklist.frequency === 'Monthly' ? date.getDate() === checklist.dayOfMonth : checklist.frequency === 'Weekly' && (date.getDay() || 7) === checklist.weekday) upcomingRuleDates.push({ date: dateStr, label: checklist.name });
+            if (checklist.frequency === 'Monthly' ? date.getDate() === checklist.dayOfMonth : checklist.frequency === 'Weekly' && (date.getDay() || 7) === checklist.weekday) upcomingRuleDates.push({ date: dateStr, label: `${checklist.name} #${checklist.id}` });
         }
     }
     const auditedDates = new Set((audits.data ?? []).map((a: SopAudit) => a.auditDate));

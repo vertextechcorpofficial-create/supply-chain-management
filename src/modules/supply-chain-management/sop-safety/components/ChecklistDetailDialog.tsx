@@ -1,6 +1,6 @@
 'use client';
-import { useState } from 'react';
-import { Pencil } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { GripVertical, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -12,12 +12,30 @@ import { SopFormDialog, type SopForm } from './SopFormDialog';
 import { SopEmptyState, SopSectionHeading } from './SopUi';
 import { useSopAccess } from './SopAccessProvider';
 import type { SopChecklist } from '../types';
+import type { SopChecklistDetail } from '../types';
+import { sopRequest } from '../services/sopClient';
 
 export function ChecklistDetailDialog({ checklist, onClose, onChanged }: { checklist: SopChecklist | null; onClose: () => void; onChanged?: () => void }) {
     const { result, error, loading, retry } = useChecklistDetail(checklist?.id ?? null);
     const access = useSopAccess();
     const [form, setForm] = useState<SopForm>();
+    const [orderedItems, setOrderedItems] = useState<SopChecklistDetail['items']>([]);
+    const [draggedId, setDraggedId] = useState<number | null>(null);
     const changed = () => { retry(); onChanged?.(); };
+    useEffect(() => { if (result) queueMicrotask(() => setOrderedItems([...result.items].sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id))); }, [result]);
+    const moveItem = async (targetId: number) => {
+        if (!access.managePlanning || draggedId === null || draggedId === targetId) return;
+        const next = [...orderedItems];
+        const from = next.findIndex(item => item.id === draggedId);
+        const to = next.findIndex(item => item.id === targetId);
+        if (from < 0 || to < 0) return;
+        const [moved] = next.splice(from, 1);
+        next.splice(to, 0, moved);
+        setOrderedItems(next);
+        await Promise.all(next.map((item, index) => sopRequest(`items/${item.id}`, { method: 'PUT', body: { section: item.section, description: item.description, weight: item.weight, sortOrder: (index + 1) * 10, active: item.active } })));
+        setDraggedId(null);
+        changed();
+    };
     const metadata = result?.checklist ?? checklist;
     return <Dialog open={checklist !== null} onOpenChange={open => { if (!open) onClose(); }}>
         <DialogContent className="flex max-h-[90dvh] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
@@ -31,10 +49,10 @@ export function ChecklistDetailDialog({ checklist, onClose, onChanged }: { check
                 {!loading && !error && result && <>
                     <SopSectionHeading title="Requirements" count={result.items.length} actions={<ChecklistAdmin checklist={result.checklist} detail={result} onChanged={changed} />} />
                     {!result.items.length && <SopEmptyState title="No checklist items yet" description={access.managePlanning ? 'Add the first requirement to this checklist.' : 'This checklist has no configured requirements.'} />}
-                    <div className="overflow-hidden rounded-lg border">{groupChecklistItems(result.items).map(group => <section key={group.section} aria-label={`${group.section} checklist items`}>
+                    <div className="overflow-hidden rounded-lg border">{groupChecklistItems(orderedItems).map(group => <section key={group.section} aria-label={`${group.section} checklist items`}>
                         <div className="flex items-center justify-between border-y bg-muted/40 px-3 py-2 first:border-t-0"><h4 className="text-xs font-semibold">{group.section}</h4><span className="text-[11px] text-muted-foreground">{group.items.length} {group.items.length === 1 ? 'item' : 'items'}</span></div>
-                        <div className="divide-y">{group.items.map(item => <div key={item.id} className={cn('flex items-start justify-between gap-3 px-3 py-2.5', !item.active && 'bg-muted/20')}>
-                            <div className="min-w-0 flex-1"><p className={cn('break-words text-sm leading-5', !item.active && 'text-muted-foreground')}>{item.description}</p><div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground"><span>Weight {item.weight}</span><span>Order {item.sortOrder}</span>{!item.active && <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">Inactive</Badge>}</div></div>
+                        <div className="divide-y">{group.items.map(item => <div key={item.id} draggable={access.managePlanning} onDragStart={() => setDraggedId(item.id)} onDragOver={event => event.preventDefault()} onDrop={() => void moveItem(item.id)} className={cn('flex items-start justify-between gap-3 px-3 py-2.5', access.managePlanning && 'cursor-grab', !item.active && 'bg-muted/20')}>
+                            <div className="flex min-w-0 flex-1 items-start gap-2"><GripVertical className="mt-1 size-4 shrink-0 text-muted-foreground" aria-hidden="true" /><div><p className={cn('break-words text-sm leading-5', !item.active && 'text-muted-foreground')}>{item.description}</p><div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground"><span>Weight {item.weight}</span><span>Order {item.sortOrder}</span>{!item.active && <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">Inactive</Badge>}</div></div></div>
                             {access.managePlanning && <Button size="sm" variant="ghost" className="h-7 shrink-0 px-2 text-xs" aria-label={`Edit ${item.description}`} onClick={() => setForm(checklistItemForm(result, item))}><Pencil className="mr-1 size-3" />Edit</Button>}
                         </div>)}</div>
                     </section>)}</div>

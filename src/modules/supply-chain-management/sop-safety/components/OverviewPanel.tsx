@@ -18,7 +18,7 @@ import { useSopAccess } from './SopAccessProvider';
 import { CorrectiveActions } from './CorrectiveActions';
 import { SchedulesPanel } from './SchedulesPanel';
 
-export function OverviewPanel({ branch, branches }: { branch: string; branches: LookupOption[] }) {
+export function OverviewPanel({ branch, branches, onStartAuditDate }: { branch: string; branches: LookupOption[]; onStartAuditDate?: (date: string) => void }) {
     const access = useSopAccess();
     const [from, setFrom] = useState(`${todayManila().slice(0, 7)}-01`);
     const [to, setTo] = useState(todayManila());
@@ -48,7 +48,7 @@ export function OverviewPanel({ branch, branches }: { branch: string; branches: 
         { label: 'Open actions', value: counts.data?.open?.toLocaleString(), icon: Wrench, color: 'text-orange-600 dark:text-orange-400', detail: 'Across all dates', loading: counts.loading },
     ];
     return <div className="space-y-4">
-        <SchedulesPanel branch={branch} branches={branches} recurringOnly />
+        <SchedulesPanel branch={branch} branches={branches} recurringOnly onStartAuditDate={onStartAuditDate} />
         <SopFilterToolbar><div className="w-full sm:w-60 flex items-center gap-2"><span className="text-sm font-medium text-muted-foreground">Warehouse</span><span className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-medium text-foreground border-transparent bg-muted">CENTRAL WAREHOUSE (#278)</span></div><ReportingPeriod from={from} to={to} onFrom={setFrom} onTo={setTo} /><Button size="sm" variant="outline" className="h-9 sm:ml-auto" disabled={kpi.loading || counts.loading || scheduleCounts.loading} onClick={() => { kpi.reload(); counts.reload(); scheduleCounts.reload(); }}><RefreshCw className="mr-2 size-3.5" />Refresh</Button></SopFilterToolbar>
         <SopError error={kpi.error} retry={kpi.reload} /><SopError error={counts.error} retry={counts.reload} />
         {access.roles.includes('VIEWER') && <section className="space-y-3 rounded-xl border border-amber-300 bg-amber-50/40 p-4 dark:border-amber-900 dark:bg-amber-950/20" aria-label="Open corrective cases"><div className="flex items-center gap-2"><Wrench className="size-5 text-amber-700 dark:text-amber-400" /><h2 className="text-base font-semibold">Open cases requiring attention</h2></div><p className="text-xs text-muted-foreground">Open corrective actions for the selected warehouse, across all dates. Overdue due dates are highlighted below.</p><CorrectiveActions key={branch} branch={branch} openOnly onChanged={counts.reload} /></section>}

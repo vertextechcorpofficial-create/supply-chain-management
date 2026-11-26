@@ -15,13 +15,13 @@ import { ruleSchema, type SopRule } from '../schemas/response.schema';
 const weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export function checklistItemForm(detail: SopChecklistDetail, item?: SopChecklistDetail['items'][number]): SopForm {
-    const fields: SopField[] = [{ name: 'section', label: 'Section', required: true, suggestions: Array.from(new Set(detail.items.map(row => row.section))) }, { name: 'description', label: 'Requirement', type: 'textarea', required: true }, { name: 'weight', label: 'Weight', type: 'number', min: 0, required: true }, { name: 'sortOrder', label: 'Sort order', type: 'number', required: true }, { name: 'active', label: 'Status', type: 'select', required: true, options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] }];
+    const fields: SopField[] = [{ name: 'section', label: 'Section', required: true, suggestions: Array.from(new Set(detail.items.map(row => row.section))) }, { name: 'description', label: 'Requirement', type: 'textarea', required: true }, { name: 'weight', label: 'Weight', type: 'number', min: 0, required: true }, ...(item ? [{ name: 'sortOrder', label: 'Sort order', type: 'number', required: true } satisfies SopField] : []), { name: 'active', label: 'Status', type: 'select', required: true, options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] }];
     return {
         title: item ? 'Edit checklist item' : 'Add checklist item',
         description: 'Choose an existing section or enter a new one. Saved audit results keep their original requirements and weights.',
         fields,
         initial: item ? { section: item.section, description: item.description, weight: String(item.weight), sortOrder: String(item.sortOrder), active: String(item.active) } : { weight: '1', sortOrder: String(Math.max(0, ...detail.items.map(row => row.sortOrder)) + 10), active: 'true' },
-        save: async values => { await sopRequest(item ? `items/${item.id}` : `checklists/${detail.checklist.id}/items`, { method: item ? 'PUT' : 'POST', body: { section: values.section, description: values.description, weight: Number(values.weight), sortOrder: Number(values.sortOrder), active: values.active === 'true' } }); },
+        save: async values => { await sopRequest(item ? `items/${item.id}` : `checklists/${detail.checklist.id}/items`, { method: item ? 'PUT' : 'POST', body: { section: values.section, description: values.description, weight: Number(values.weight), sortOrder: item ? Number(values.sortOrder) : Math.max(0, ...detail.items.map(row => row.sortOrder)) + 10, active: values.active === 'true' } }); },
     };
 }
 
