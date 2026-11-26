@@ -1,4 +1,13 @@
 /** SOP owns its contract; never forward arbitrary paths, queries, or credentials. */
+import { SOP_CENTRAL_WAREHOUSE_ID } from '../centralWarehouse';
+
+const centralBranch = String(SOP_CENTRAL_WAREHOUSE_ID);
+function requireCentralBranch(result: URLSearchParams) {
+    if (result.has('branchId') && result.get('branchId') !== centralBranch) {
+        throw new Error('SOP & Safety is limited to the Central Warehouse.');
+    }
+}
+
 export function sopReadPath(parts: string[]): string | null {
     const path = parts.join('/');
     if (path === 'checklists' || /^checklists\/[1-9]\d*$/.test(path)) return `/api/sop-safety/${path}`;
@@ -40,6 +49,7 @@ export function sopQuery(resource: string, input: URLSearchParams): URLSearchPar
         result.set(key, value);
     }
     if (result.has('from') && result.has('to') && result.get('from')! > result.get('to')!) throw new Error('From date must not follow to date.');
+    requireCentralBranch(result);
     if (['corrective-actions', 'schedules'].includes(resource)) {
         if (!result.has('page')) result.set('page', '1');
         if (!result.has('pageSize')) result.set('pageSize', '25');
@@ -57,6 +67,7 @@ export function sopAuditListQuery(input: URLSearchParams): URLSearchParams {
         result.set(key, value);
     }
     if (result.has('from') && result.has('to') && result.get('from')! > result.get('to')!) throw new Error('From date must not follow to date.');
+    requireCentralBranch(result);
     if (!result.has('page')) result.set('page', '1');
     if (!result.has('pageSize')) result.set('pageSize', '25');
     return result;

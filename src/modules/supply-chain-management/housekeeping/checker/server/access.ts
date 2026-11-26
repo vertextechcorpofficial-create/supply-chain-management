@@ -3,6 +3,7 @@ import { COOKIE_NAME } from '@/lib/auth-utils';
 import { secureEndpoint, verifySession } from '../../server/security';
 import { readItems } from '../../server/queries';
 import { housekeepingRoles } from '../permissions';
+import { CENTRAL_WAREHOUSE_ID } from '../../shared/warehouse';
 import { z } from 'zod';
 
 export class CheckerAccessError extends Error { constructor(readonly status: number, message: string) { super(message); } }
@@ -28,7 +29,7 @@ export async function authorizeChecker(req: Parameters<typeof authorizeHousekeep
     const access = await authorizeHousekeeping(req); access.requireRole('checker');
     // Verified Checker workspace access grants active-warehouse reads. Selection
     // remains a filter; resolution writes have a separate authorization policy.
-    const warehouses = await readItems('branches', ['id', 'branch_name', 'branch_code', 'isActive'], { isActive: { _eq: 1 } }, z.array(approvedWarehouseSchema));
+    const warehouses = await readItems('branches', ['id', 'branch_name', 'branch_code', 'isActive'], { id: { _eq: CENTRAL_WAREHOUSE_ID }, isActive: { _eq: 1 } }, z.array(approvedWarehouseSchema));
     // Like SOP Safety: role grants resolution access; the mutation handler
     // independently verifies the current action's assignment and lifecycle.
     const canComplete = access.roles.includes('checker');

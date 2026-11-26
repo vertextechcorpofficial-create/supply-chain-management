@@ -8,14 +8,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { auditSchema, pageSchema } from '../schemas/response.schema';
 import { useSopResource } from '../hooks/useSopResource';
 import { readSop } from '../services/sopClient';
-import { SopError, SopLoading, SopPager, SopSelect, SopStatus, type LookupOption } from './SopShared';
+import { SopError, SopLoading, SopPager, SopSelect, SopStatus } from './SopShared';
 import type { SopChecklist } from '../types';
 import { useSopAccess } from './SopAccessProvider';
 import { sopResultWorkspace } from '../permissions';
 import { SopFilterToolbar } from './SopUi';
 import { Label } from '@/components/ui/label';
 
-export function AuditsPanel({ branch, branches, checklists, onBranch }: { branch: string; branches: LookupOption[]; checklists: SopChecklist[]; onBranch: (value: string) => void }) {
+export function AuditsPanel({ branch, checklists }: { branch: string; checklists: SopChecklist[] }) {
     const access = useSopAccess();
     const [page, setPage] = useState(1);
     const [status, setStatus] = useState(access.roles.includes('VIEWER') ? 'Submitted' : 'ALL');
@@ -27,7 +27,7 @@ export function AuditsPanel({ branch, branches, checklists, onBranch }: { branch
     const rows = resource.data?.audits;
     return <Card className="gap-0 rounded-xl py-0 shadow-xs"><CardContent className="space-y-3 p-4">
         <SopFilterToolbar className="border-0 p-0 shadow-none">
-            <div className="w-full sm:w-52"><SopSelect label="Warehouse" value={branch} options={branches} onChange={value => { onBranch(value); setPage(1); }} /></div>
+            <div className="w-full sm:w-52 flex items-center gap-2"><span className="text-sm font-medium text-muted-foreground">Warehouse</span><span className="inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-medium text-foreground border-transparent bg-muted">CENTRAL WAREHOUSE (#278)</span></div>
             <div className="w-full sm:w-36"><SopSelect label="Audit status" value={status} options={['ALL', 'Draft', 'Submitted', 'Cancelled'].map(value => ({ value, label: value === 'ALL' ? 'All statuses' : value }))} onChange={value => { setStatus(value); setPage(1); }} /></div>
             <div className="w-full sm:w-52"><SopSelect label="Checklist" value={checklist} options={[{ value: 'ALL', label: 'All checklists' }, ...checklists.map(row => ({ value: String(row.id), label: row.name }))]} onChange={value => { setChecklist(value); setPage(1); }} /></div>
             <div className="grid w-full grid-cols-2 gap-2 sm:w-72"><div className="space-y-1"><Label htmlFor="sop-audits-from" className="text-[11px] text-muted-foreground">From</Label><Input id="sop-audits-from" className="h-9 min-w-0 text-xs" aria-label="From date" type="date" value={from} onChange={event => { setFrom(event.target.value); setPage(1); }} /></div><div className="space-y-1"><Label htmlFor="sop-audits-to" className="text-[11px] text-muted-foreground">To</Label><Input id="sop-audits-to" className="h-9 min-w-0 text-xs" aria-label="To date" type="date" value={to} onChange={event => { setTo(event.target.value); setPage(1); }} /></div></div>

@@ -1,10 +1,8 @@
 import { z } from 'zod';
+import { CENTRAL_WAREHOUSE_ID, CENTRAL_WAREHOUSE_NAME } from '../shared/warehouse';
 
 export const dummyWarehouses = [
-    { id: 190, name: 'WAREHOUSE - DRY22' },
-    { id: 194, name: 'WAREHOUSE - FROZEN' },
-    { id: 196, name: 'WAREHOUSE - INDUSTRIAL' },
-    { id: 278, name: 'CENTRAL WAREHOUSE' },
+    { id: CENTRAL_WAREHOUSE_ID, name: CENTRAL_WAREHOUSE_NAME },
 ] as const;
 
 const id = z.number().int().positive();
