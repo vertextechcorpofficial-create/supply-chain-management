@@ -2094,7 +2094,11 @@ export function UpdateSalesReturnModal({
         open={isUnsavedConfirmOpen}
         onOpenChange={setIsUnsavedConfirmOpen}
       >
-        <DialogContent className="max-w-[420px] p-6 bg-background rounded-xl shadow-2xl border border-border">
+        <DialogContent
+          className="max-w-[420px] p-6 bg-background rounded-xl shadow-2xl border border-border"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <div className="flex flex-col items-center text-center gap-4">
             <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
               <AlertTriangle className="h-6 w-6 text-destructive" />
@@ -2110,14 +2114,11 @@ export function UpdateSalesReturnModal({
           </div>
           <div className="flex flex-col gap-2 mt-6">
             <Button
-              onClick={async () => {
-                setIsUnsavedConfirmOpen(false);
-                handleUpdateClick();
-              }}
-              disabled={isUpdating}
-              className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold"
+              variant="outline"
+              onClick={() => setIsUnsavedConfirmOpen(false)}
+              className="w-full font-semibold"
             >
-              Save & Exit
+              Stay and Continue Editing
             </Button>
             <Button
               onClick={handleDiscardAndExit}
@@ -2128,15 +2129,7 @@ export function UpdateSalesReturnModal({
               {isUpdating ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : null}
-              Discard & Exit
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setIsUnsavedConfirmOpen(false)}
-              disabled={isUpdating}
-              className="w-full font-semibold"
-            >
-              Cancel
+              Leave and Discard Changes
             </Button>
           </div>
         </DialogContent>

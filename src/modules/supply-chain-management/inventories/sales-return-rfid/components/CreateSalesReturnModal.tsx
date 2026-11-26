@@ -1988,7 +1988,11 @@ export function CreateSalesReturnModal({ isOpen, onClose, onSuccess }: Props) {
         open={isUnsavedConfirmOpen}
         onOpenChange={setIsUnsavedConfirmOpen}
       >
-        <DialogContent className="max-w-[400px] p-6 bg-background rounded-xl shadow-2xl border border-border">
+        <DialogContent
+          className="max-w-[420px] p-6 bg-background rounded-xl shadow-2xl border border-border"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
           <div className="flex flex-col items-center text-center gap-4">
             <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
               <AlertTriangle className="h-6 w-6 text-destructive" />
@@ -1998,25 +2002,27 @@ export function CreateSalesReturnModal({ isOpen, onClose, onSuccess }: Props) {
                 Unsaved Changes
               </DialogTitle>
               <div className="text-sm text-muted-foreground">
-                You have unsaved changes. Are you sure you want to discard them?
+                You have unsaved changes. How would you like to proceed?
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 mt-6">
+          <div className="flex flex-col gap-2 mt-6">
             <Button
               variant="outline"
               onClick={() => setIsUnsavedConfirmOpen(false)}
+              className="w-full font-semibold"
             >
-              Cancel
+              Stay and Continue Editing
             </Button>
             <Button
-              variant="destructive"
               onClick={() => {
                 setIsUnsavedConfirmOpen(false);
                 handleClose();
               }}
+              variant="destructive"
+              className="w-full font-semibold"
             >
-              Discard & Exit
+              Leave and Discard Changes
             </Button>
           </div>
         </DialogContent>

@@ -220,7 +220,7 @@ export function ProductLookupModal({
       // Robust grouping key derivation
       const rawParentId = product.parent_id;
       let finalParentIdNum: number | null = null;
-      
+
       if (rawParentId && typeof rawParentId === "object") {
         finalParentIdNum = Number(rawParentId.product_id || rawParentId.id);
       } else if (rawParentId !== null && rawParentId !== undefined) {
@@ -233,14 +233,14 @@ export function ProductLookupModal({
 
       if (!groups[groupKey]) {
         groups[groupKey] = {
-          parent: product, 
+          parent: product,
           variants: [],
         };
       } else if (!finalParentIdNum || finalParentIdNum <= 0) {
         // If we found the actual base product (no parent), set it as the structural parent for display
         groups[groupKey].parent = product;
       }
-      
+
       groups[groupKey].variants.push(product);
     });
 
@@ -732,77 +732,77 @@ export function ProductLookupModal({
                         </CardHeader>
                         <CardContent className="p-0 flex flex-col flex-1 divide-y divide-border">
                           {group.variants.map((product) => {
-                             const safePrice = resolvePrice(product, priceType);
-                             
-                             const unitObj = unitsList.find(
-                               (u) => u.unit_id === product.unit_of_measurement,
-                             );
-                             const baseUnitName = unitObj ? unitObj.unit_name : "Piece";
-                             const baseUnitShortcut = unitObj
-                               ? unitObj.unit_shortcut
-                               : "pcs";
+                            const safePrice = resolvePrice(product, priceType);
+
+                            const unitObj = unitsList.find(
+                              (u) => u.unit_id === product.unit_of_measurement,
+                            );
+                            const baseUnitName = unitObj ? unitObj.unit_name : "Piece";
+                            const baseUnitShortcut = unitObj
+                              ? unitObj.unit_shortcut
+                              : "pcs";
 
                             return (
-                               <div key={product.product_id} className="p-4 flex flex-col gap-3">
-                                  <div className="flex justify-between items-start">
-                                    <div className="flex flex-col">
-                                      <span className="text-xs text-muted-foreground font-mono">
-                                        Code: <span className="text-foreground font-medium">{product.product_code || product.barcode || "N/A"}</span>
-                                      </span>
-                                    </div>
-                                    <Badge variant="outline" className="font-normal text-xs bg-background">
-                                      {baseUnitName}
-                                    </Badge>
+                              <div key={product.product_id} className="p-4 flex flex-col gap-3">
+                                <div className="flex justify-between items-start">
+                                  <div className="flex flex-col">
+                                    <span className="text-xs text-muted-foreground font-mono">
+                                      Code: <span className="text-foreground font-medium">{product.product_code || product.barcode || "N/A"}</span>
+                                    </span>
                                   </div>
-                                  
-                                  <div className="flex items-center justify-between mt-auto">
-                                    <div className="flex flex-col">
-                                      <span className="font-bold text-foreground text-sm">
-                                        ₱
-                                        {safePrice.toLocaleString(undefined, {
-                                          minimumFractionDigits: 2,
-                                        })}
-                                      </span>
-                                      <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                                        (1 {baseUnitShortcut})
-                                      </span>
-                                    </div>
-                                    {(() => {
-                                      const existingItem = selectedItems.find(
-                                        (i) =>
-                                          i.productId === product.product_id &&
-                                          i.unit === baseUnitShortcut.toUpperCase() &&
-                                          i.unitPrice === safePrice,
-                                      );
-                                      const unitOrder = unitObj ? unitObj.order : 0;
-                                      
-                                      if (existingItem && unitOrder === 3) {
-                                        return (
-                                          <Button
-                                            size="sm"
-                                            variant="destructive"
-                                            className="h-8 shadow-sm shadow-destructive/20"
-                                            onClick={() => handleRemoveItem(existingItem.tempId)}
-                                          >
-                                            <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
-                                          </Button>
-                                        );
-                                      }
+                                  <Badge variant="outline" className="font-normal text-xs bg-background">
+                                    {baseUnitName}
+                                  </Badge>
+                                </div>
 
+                                <div className="flex items-center justify-between mt-auto">
+                                  <div className="flex flex-col">
+                                    <span className="font-bold text-foreground text-sm">
+                                      ₱
+                                      {safePrice.toLocaleString(undefined, {
+                                        minimumFractionDigits: 2,
+                                      })}
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                                      (1 {baseUnitShortcut})
+                                    </span>
+                                  </div>
+                                  {(() => {
+                                    const existingItem = selectedItems.find(
+                                      (i) =>
+                                        i.productId === product.product_id &&
+                                        i.unit === baseUnitShortcut.toUpperCase() &&
+                                        i.unitPrice === safePrice,
+                                    );
+                                    const unitOrder = unitObj ? unitObj.order : 0;
+
+                                    if (existingItem && unitOrder === 3) {
                                       return (
                                         <Button
                                           size="sm"
-                                          className="h-8 shadow-sm shadow-primary/20"
-                                          onClick={() =>
-                                            handleAddItem(product, baseUnitShortcut.toUpperCase(), safePrice)
-                                          }
+                                          variant="destructive"
+                                          className="h-8 shadow-sm shadow-destructive/20"
+                                          onClick={() => handleRemoveItem(existingItem.tempId)}
                                         >
-                                          <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                                          <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
                                         </Button>
                                       );
-                                    })()}
-                                  </div>
-                               </div>
+                                    }
+
+                                    return (
+                                      <Button
+                                        size="sm"
+                                        className="h-8 shadow-sm shadow-primary/20"
+                                        onClick={() =>
+                                          handleAddItem(product, baseUnitShortcut.toUpperCase(), safePrice)
+                                        }
+                                      >
+                                        <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                                      </Button>
+                                    );
+                                  })()}
+                                </div>
+                              </div>
                             );
                           })}
                         </CardContent>
